@@ -1,0 +1,32 @@
+def null l = nil = l
+
+def take n l =
+  if n=0 or (null l)
+  then nil
+  else (x : take (n-1) xs)
+       where x  = hd l;
+             xs = tl l
+
+def filter p l =
+  if null l
+  then nil
+  else (if p x
+        then x : filter p xs
+        else filter p xs)
+       where x  = hd l;
+             xs = tl l
+
+def numbers x = x : numbers (x + 1)
+
+def mod x y = x - ((x / y) * y)
+
+def isnotmult y x = (mod x y) > 0
+
+def sieve l =
+  x : (sieve (filter (isnotmult x) xs))
+  where x  = hd l;
+        xs = tl l
+
+.
+
+take 7 (sieve (numbers 2))

@@ -1,0 +1,35 @@
+def lt x y = x<y
+def geq x y = x>=y
+def null l = l=nil
+
+def filter p l =
+  if null l
+  then nil
+  else (if p x
+        then x : filter p xs
+        else filter p xs)
+       where x  = hd l;
+             xs = tl l
+
+def append l1 l2 =
+  if null l1
+  then l2
+  else x : append xs l2
+       where x  = hd l1;
+             xs = tl l1
+
+def append2 l1 l2 l3 =
+  append l1 (append l2 l3)
+
+def qsort l =
+  if null l
+  then nil
+  else (append2 (qsort lesser) [p] (qsort greater))
+       where p = hd l;
+             ps = tl l;
+             lesser  = filter (geq p) ps;
+             greater = filter (lt p) ps
+
+.
+
+qsort [3,1,4,1,5,9,7]
