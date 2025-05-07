@@ -53,10 +53,15 @@ def charWhitespace(char: Byte): Boolean =
     || char == '\r'
     || char == '\f'
 
+trait PeekIterator[A] extends Iterator[A] {
+  /** Method to peek at the next element without consuming it */
+  def peek(): Option[A]
+}
+
 // ToDo: Input should be immutable
 // ToDo: Proper Error-Handling
 // ToDo: UTF8-Support in the marked places
-class Lexer(private val raw: Array[Byte]) extends Iterator[Token]:
+class Lexer(private val raw: Array[Byte]) extends PeekIterator[Token]:
   private var idx = 0
   private var preview = previewIterate()
 
@@ -204,3 +209,22 @@ class Lexer(private val raw: Array[Byte]) extends Iterator[Token]:
         preview = previewIterate()
         value
       case None => throw new NoSuchElementException
+
+class TestLexer[Token](vals: Array[Token]) extends PeekIterator[Token]:
+  private var current = 0;
+
+  def hasNext: Boolean = current < vals.length
+  def peek(): Option[Token] =
+    if (current < vals.length) {
+      Some(vals(current))
+    } else {
+      None
+    }
+
+  def next(): Token =
+    if (current < vals.length) {
+      current += 1
+      vals(current - 1)
+    } else {
+      throw new NoSuchElementException
+    }
