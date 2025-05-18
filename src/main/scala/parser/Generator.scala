@@ -25,7 +25,7 @@ class ParserGenerator[Token <: scala.reflect.Enum, NonTerminal <: scala.reflect.
   /** a map from NT and T to Derivation */
   type ParseTable = Array[Array[Option[Derivation]]]
 
-  private def first(numNonTerminals: Int, dm: DerivationsMap, em: EmptyMap): (FirstMap, EmptyMap) = {
+  def first(numNonTerminals: Int, dm: DerivationsMap, em: EmptyMap): (FirstMap, EmptyMap) = {
     val firstMap = Array.fill(numNonTerminals)(Set[Token]())
     //val canBeEmpty = Array.fill(numNonTerminals)(false)
 
@@ -58,7 +58,7 @@ class ParserGenerator[Token <: scala.reflect.Enum, NonTerminal <: scala.reflect.
     (firstMap, em)
   }
 
-  private def follow(numNonTerminals: Int, dm: DerivationsMap, em: EmptyMap, firstMap: FirstMap): FollowMap = {
+  def follow(numNonTerminals: Int, dm: DerivationsMap, em: EmptyMap, firstMap: FirstMap): FollowMap = {
   //private def follow(numNonTerminals: Int, dm: DerivationsMap, em: EmptyMap, firstMap: FirstMap, fm: FinalMap): (FollowMap, FinalMap) = {
     val followMap = Array.fill(numNonTerminals)(Set[Token]())
 

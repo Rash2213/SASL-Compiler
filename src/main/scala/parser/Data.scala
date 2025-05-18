@@ -67,19 +67,19 @@ object SaslData:
   import GrammarSymbolGeneric.*
 
   val derMap: gen.DerivationsMap = Array(
-    //  ⟨system⟩ → def id ⟨abstraction⟩ ⟨funcdefs’⟩ . ⟨condexpr⟩ ⟨expr’⟩
+    //  ⟨system⟩ → def id ⟨abstraction⟩ ⟨expr’⟩ ⟨funcdefs’⟩ . ⟨condexpr⟩ ⟨expr’⟩
     //    | ⟨condexpr⟩ ⟨expr’⟩
     Array(
       Array[gen.GrammarSymbol](T(KDef), T(Id("")), NT(Abstraction), NT(ExprP), NT(FuncDefsP), T(KDot), NT(CondExpr), NT(ExprP)),
       Array[gen.GrammarSymbol](NT(CondExpr), NT(ExprP))
     ),
-    //  ⟨funcdefs’⟩ → def id ⟨abstraction⟩ ⟨funcdefs’⟩
+    //  ⟨funcdefs’⟩ → def id ⟨abstraction⟩ ⟨expr’⟩ ⟨funcdefs’⟩
     //    | ε
     Array(Array[gen.GrammarSymbol](T(KDef), T(Id("")), NT(Abstraction), NT(ExprP), NT(FuncDefsP))),
     //  ⟨defs’⟩ → ; id ⟨abstraction⟩ ⟨defs’⟩
     //    | ε
     Array(Array[gen.GrammarSymbol](T(KSemicolon), T(Id("")), NT(Abstraction), NT(DefsP))),
-    //  ⟨abstraction⟩ → = ⟨condexpr⟩ ⟨expr’⟩
+    //  ⟨abstraction⟩ → = ⟨condexpr⟩
     //    | id ⟨abstraction⟩
     Array(
       Array[gen.GrammarSymbol](T(SEqual), NT(CondExpr)/*, NT(ExprP)*/),
