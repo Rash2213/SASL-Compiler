@@ -1,0 +1,30 @@
+digraph ParseTree {
+  node17 [label="Program"];
+  node18 [label="@"];
+  node19 [label="@"];
+  node20 [label="myplus"];
+  node21 [label="x"];
+  node19 -> node20;
+  node19 -> node21;
+  node22 [label="y"];
+  node18 -> node19;
+  node18 -> node22;
+  node17 -> node18;
+  node23 [label="x"];
+  node24 [label="12"];
+  node23 -> node24;
+  node25 [label="y"];
+  node26 [label="42"];
+  node25 -> node26;
+  node27 [label="myplus(x, y)"];
+  node28 [label="@"];
+  node29 [label="@"];
+  node30 [label="plus"];
+  node31 [label="x"];
+  node29 -> node30;
+  node29 -> node31;
+  node32 [label="y"];
+  node28 -> node29;
+  node28 -> node32;
+  node27 -> node28;
+}

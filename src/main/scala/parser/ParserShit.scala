@@ -25,11 +25,13 @@ enum ParseError:
 object ParserShit:
   val gen: ParserGenerator[Token, NonTerminal] = ParserGenerator()
 
+type VariableMap = mutable.Map[String, (ParseTree, Array[String])]
+
 import ParseTree.*
 import Constant.*
 
 // variableMap is a map from a name to a ParseTree, we prepend the scope to the variable name
-case class ParserResult(variableMap: Map[String, ParseTree], pTree: ParseTree)
+// case class ParserResult(variableMap: Map[String, ParseTree], pTree: ParseTree)
 
 //  ⟨system⟩ → def id ⟨abstraction⟩ ⟨expr’⟩ ⟨funcdefs’⟩ . ⟨condexpr⟩ ⟨expr’⟩
 //    | ⟨condexpr⟩ ⟨expr’⟩
