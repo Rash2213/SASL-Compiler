@@ -525,7 +525,7 @@ class ParserShitSpec extends munit.FunSuite {
     }
   }
 
-  test("listp' non-terminal is derived correctly") {
+  test("list' non-terminal is derived correctly") {
     val varMap: mutable.Map[String, ParseTree] = mutable.Map()
 
     val lEmpty = TestLexer(Array(KCloseBracket))
@@ -533,8 +533,8 @@ class ParserShitSpec extends munit.FunSuite {
       assertEquals(pt, Const(Constant.Nil))
     }
 
-    /*val lSingle = TestLexer(Array(CNum(1), KCloseBracket))
-    parseSuccess(parserShitListElemsP(lSingle, firstSet, varMap, Const(Constant.Nil))) { pt =>
+    val lSingle = TestLexer(Array(CNum(1), KCloseBracket))
+    parseSuccess(parserShitListP(lSingle, firstSet, varMap)) { pt =>
       assertEquals(pt,
         Application(
           Application(
@@ -547,7 +547,7 @@ class ParserShitSpec extends munit.FunSuite {
     }
 
     val lMultiple = TestLexer(Array(CNum(1), KComma, CBool(true), KComma, CString("test"), KCloseBracket))
-    parseSuccess(parserShitListElemsP(lMultiple, firstSet, varMap, Const(Constant.Nil))) { pt =>
+    parseSuccess(parserShitListP(lMultiple, firstSet, varMap)) { pt =>
       assertEquals(pt,
         Application(
           Application(
@@ -569,7 +569,7 @@ class ParserShitSpec extends munit.FunSuite {
           )
         )
       )
-    }*/
+    }
   }
 
   test("system non-terminal is derived correctly") {

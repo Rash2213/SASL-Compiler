@@ -774,9 +774,26 @@ def parserShitListP(
           case Right(_) =>
           case Left(e) => return Left(e)
         }
-        val pt = parserShitListElemsP(lexer, first, variableMap, ptc) match {
+        /*val pt = parserShitListElemsP(lexer, first, variableMap, ptc) match {
           case Right(pt) => pt
           case Left(e) => return Left(e)
+        }
+        val pt2 = Application(
+          Application(
+            Ident("cons"),
+            ptc
+          ),
+          parserShitListElemsP(lexer, first, variableMap)
+        )*/
+        val pt = parserShitListElemsP(lexer, first, variableMap) match {
+          case Left(e) => return Left(e)
+          case Right(pt) => Application(
+            Application(
+              Ident("cons"),
+              ptc
+            ),
+            pt
+          )
         }
         lexer.peek() match {
           case Some(KCloseBracket) =>
@@ -815,18 +832,17 @@ def parserShitListP(
 }
 //  ⟨listelems’⟩ → , ⟨condexpr⟩ ⟨expr’⟩ ⟨listelems’⟩
 //    | ε
-@tailrec
 def parserShitListElemsP(
                           lexer: PeekIterator[Token],
                           first: ParserShit.gen.FirstMap,
                           variableMap: mutable.Map[String, ParseTree],
-                          lhs: ParseTree,
+                          //lhs: ParseTree,
                         ): Either[ParseError, ParseTree] = {
   lexer.peek() match {
     case Some(t) =>
       if (t.ordinal == KComma.ordinal) {
         lexer.next()
-        val rhs = parserShitCondExpr(lexer, first, variableMap) match {
+        val ptc = parserShitCondExpr(lexer, first, variableMap) match {
           case Right(pt) => pt
           case Left(e) => return Left(e)
         }
@@ -834,14 +850,24 @@ def parserShitListElemsP(
           case Right(_) =>
           case Left(e) => return Left(e)
         }
-        val pt = Application(
+        parserShitListElemsP(lexer, first, variableMap) match {
+          case Left(e) => Left(e)
+          case Right(pt) => Right(Application(
+            Application(
+              Ident("cons"),
+              ptc
+            ),
+            pt
+          ))
+        }
+        /*val pt = Application(
           Application(
             Ident("cons"),
             rhs
           ),
           lhs
         )
-        parserShitListElemsP(lexer, first, variableMap, pt)
+        parserShitListElemsP(lexer, first, variableMap, pt)*/
         /*val elems = parserShitListElemsP(lexer, first, variableMap) match {
           case Right(pt) => pt
           case Left(e) => return Left(e)
@@ -854,7 +880,14 @@ def parserShitListElemsP(
           elems
         ))*/
       } else {
-        Right(Const(Nil))
+        /*Right(Application(
+          Application(
+            Ident("cons"),
+            lhs
+          ),
+          Const(Constant.Nil)
+        ))*/
+        Right(Const(Constant.Nil))
       }
     case None =>
       Left(ParseError.ToDo)
