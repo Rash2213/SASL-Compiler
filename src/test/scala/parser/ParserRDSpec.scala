@@ -7,7 +7,7 @@ import parser.SaslData.{NonTerminal, derMap, emMap}
 
 import scala.collection.mutable
 
-class ParserShitSpec extends munit.FunSuite {
+class ParserRDSpec extends munit.FunSuite {
   val gen: ParserGenerator[Token, NonTerminal] = ParserGenerator()
   val fr = gen.first(NonTerminal.values.length, derMap, emMap)
   val firstSet = fr._1
@@ -28,16 +28,16 @@ class ParserShitSpec extends munit.FunSuite {
     val lBool = TestLexer(Array(CBool(true)))
     val lNil = TestLexer(Array(CNil))
 
-    parseSuccess(parserShitSimple(lId, firstSet, varMap, scopes, 0)) { pt =>
+    parseSuccess(parserRDSimple(lId, firstSet, varMap, scopes, 0)) { pt =>
       assertEquals(pt, Ident("0myVar"))
     }
-    parseSuccess(parserShitSimple(lNum, firstSet, varMap, scopes, 0)) { pt =>
+    parseSuccess(parserRDSimple(lNum, firstSet, varMap, scopes, 0)) { pt =>
       assertEquals(pt, Const(Constant.Num(12)))
     }
-    parseSuccess(parserShitSimple(lBool, firstSet, varMap, scopes, 0)) { pt =>
+    parseSuccess(parserRDSimple(lBool, firstSet, varMap, scopes, 0)) { pt =>
       assertEquals(pt, Const(Constant.Bool(true)))
     }
-    parseSuccess(parserShitSimple(lNil, firstSet, varMap, scopes, 0)) { pt =>
+    parseSuccess(parserRDSimple(lNil, firstSet, varMap, scopes, 0)) { pt =>
       assertEquals(pt, Const(Constant.Nil))
     }
   }
@@ -48,7 +48,7 @@ class ParserShitSpec extends munit.FunSuite {
 
     val l = TestLexer(Array(CNum(12), CBool(true), CNil))
 
-    parseSuccess(parserShitCombP(l, firstSet, varMap, scopes, 0, Ident("myVar"))) { pt =>
+    parseSuccess(parserRDCombP(l, firstSet, varMap, scopes, 0, Ident("myVar"))) { pt =>
       assertEquals(pt,
         Application(
           Application(
@@ -73,7 +73,7 @@ class ParserShitSpec extends munit.FunSuite {
     val lMinus = TestLexer(Array(SMinus, Id("myVar"), CNum(12), CBool(true), CNil))
     val lNot = TestLexer(Array(SNot, Id("myVar"), CNum(12), CBool(true), CNil))
 
-    parseSuccess(parserShitFactor(l, firstSet, varMap, scopes, 0)) { pt =>
+    parseSuccess(parserRDFactor(l, firstSet, varMap, scopes, 0)) { pt =>
       assertEquals(pt,
         Application(
           Application(
@@ -87,7 +87,7 @@ class ParserShitSpec extends munit.FunSuite {
         )
       )
     }
-    parseSuccess(parserShitFactor(lPlus, firstSet, varMap, scopes, 0)) { pt =>
+    parseSuccess(parserRDFactor(lPlus, firstSet, varMap, scopes, 0)) { pt =>
       assertEquals(pt,
         Application(
           Application(
@@ -101,7 +101,7 @@ class ParserShitSpec extends munit.FunSuite {
         )
       )
     }
-    parseSuccess(parserShitFactor(lMinus, firstSet, varMap, scopes, 0)) { pt =>
+    parseSuccess(parserRDFactor(lMinus, firstSet, varMap, scopes, 0)) { pt =>
       assertEquals(pt,
         Application(
           Ident("inv"),
@@ -118,7 +118,7 @@ class ParserShitSpec extends munit.FunSuite {
         )
       )
     }
-    parseSuccess(parserShitFactor(lNot, firstSet, varMap, scopes, 0)) { pt =>
+    parseSuccess(parserRDFactor(lNot, firstSet, varMap, scopes, 0)) { pt =>
       assertEquals(pt,
         Application(
           Ident("not"),
@@ -145,7 +145,7 @@ class ParserShitSpec extends munit.FunSuite {
     val lDiv = TestLexer(Array(SDiv, CNum(3), SMul, CNum(2)))
     val lNone = TestLexer[Token](Array())
 
-    parseSuccess(parserShitMulP(lMul, firstSet, varMap, Ident("x"), scopes, 0)) { pt =>
+    parseSuccess(parserRDMulP(lMul, firstSet, varMap, Ident("x"), scopes, 0)) { pt =>
       assertEquals(pt,
         Application(
           Application(
@@ -163,7 +163,7 @@ class ParserShitSpec extends munit.FunSuite {
       )
     }
 
-    parseSuccess(parserShitMulP(lDiv, firstSet, varMap, Ident("x"), scopes, 0)) { pt =>
+    parseSuccess(parserRDMulP(lDiv, firstSet, varMap, Ident("x"), scopes, 0)) { pt =>
       assertEquals(pt,
         Application(
           Application(
@@ -181,7 +181,7 @@ class ParserShitSpec extends munit.FunSuite {
       )
     }
 
-    parseSuccess(parserShitMulP(lNone, firstSet, varMap, Ident("x"), scopes, 0)) { pt =>
+    parseSuccess(parserRDMulP(lNone, firstSet, varMap, Ident("x"), scopes, 0)) { pt =>
       assertEquals(pt, Ident("x"))
     }
   }
@@ -194,7 +194,7 @@ class ParserShitSpec extends munit.FunSuite {
     val lMinusPlus = TestLexer(Array(SMinus, CNum(3), SPlus, CNum(2)))
     val lNone = TestLexer[Token](Array())
 
-    parseSuccess(parserShitAddP(lPlusMinus, firstSet, varMap, Ident("x"), scopes, 0)) { pt =>
+    parseSuccess(parserRDAddP(lPlusMinus, firstSet, varMap, Ident("x"), scopes, 0)) { pt =>
       assertEquals(pt,
         Application(
           Application(
@@ -212,7 +212,7 @@ class ParserShitSpec extends munit.FunSuite {
       )
     }
 
-    parseSuccess(parserShitAddP(lMinusPlus, firstSet, varMap, Ident("x"), scopes, 0)) { pt =>
+    parseSuccess(parserRDAddP(lMinusPlus, firstSet, varMap, Ident("x"), scopes, 0)) { pt =>
       assertEquals(pt,
         Application(
           Application(
@@ -230,7 +230,7 @@ class ParserShitSpec extends munit.FunSuite {
       )
     }
 
-    parseSuccess(parserShitAddP(lNone, firstSet, varMap, Ident("x"), scopes, 0)) { pt =>
+    parseSuccess(parserRDAddP(lNone, firstSet, varMap, Ident("x"), scopes, 0)) { pt =>
       assertEquals(pt, Ident("x"))
     }
   }
@@ -247,7 +247,7 @@ class ParserShitSpec extends munit.FunSuite {
     val lGeqLeq = TestLexer(Array(SGreaterEqual, CNum(3), SLessEqual, CNum(2)))
     val lNone = TestLexer[Token](Array())
 
-    parseSuccess(parserShitComparP(lEq, firstSet, varMap, Ident("x"), scopes, 0)) { pt =>
+    parseSuccess(parserRDComparP(lEq, firstSet, varMap, Ident("x"), scopes, 0)) { pt =>
       assertEquals(pt,
         Application(
           Application(
@@ -265,7 +265,7 @@ class ParserShitSpec extends munit.FunSuite {
       )
     }
 
-    parseSuccess(parserShitComparP(lNeq, firstSet, varMap, Ident("x"), scopes, 0)) { pt =>
+    parseSuccess(parserRDComparP(lNeq, firstSet, varMap, Ident("x"), scopes, 0)) { pt =>
       assertEquals(pt,
         Application(
           Application(
@@ -283,7 +283,7 @@ class ParserShitSpec extends munit.FunSuite {
       )
     }
 
-    parseSuccess(parserShitComparP(lLtGt, firstSet, varMap, Ident("x"), scopes, 0)) { pt =>
+    parseSuccess(parserRDComparP(lLtGt, firstSet, varMap, Ident("x"), scopes, 0)) { pt =>
       assertEquals(pt,
         Application(
           Application(
@@ -301,7 +301,7 @@ class ParserShitSpec extends munit.FunSuite {
       )
     }
 
-    parseSuccess(parserShitComparP(lGtLt, firstSet, varMap, Ident("x"), scopes, 0)) { pt =>
+    parseSuccess(parserRDComparP(lGtLt, firstSet, varMap, Ident("x"), scopes, 0)) { pt =>
       assertEquals(pt,
         Application(
           Application(
@@ -319,7 +319,7 @@ class ParserShitSpec extends munit.FunSuite {
       )
     }
 
-    parseSuccess(parserShitComparP(lLeqGeq, firstSet, varMap, Ident("x"), scopes, 0)) { pt =>
+    parseSuccess(parserRDComparP(lLeqGeq, firstSet, varMap, Ident("x"), scopes, 0)) { pt =>
       assertEquals(pt,
         Application(
           Application(
@@ -337,7 +337,7 @@ class ParserShitSpec extends munit.FunSuite {
       )
     }
 
-    parseSuccess(parserShitComparP(lGeqLeq, firstSet, varMap, Ident("x"), scopes, 0)) { pt =>
+    parseSuccess(parserRDComparP(lGeqLeq, firstSet, varMap, Ident("x"), scopes, 0)) { pt =>
       assertEquals(pt,
         Application(
           Application(
@@ -355,7 +355,7 @@ class ParserShitSpec extends munit.FunSuite {
       )
     }
 
-    parseSuccess(parserShitComparP(lNone, firstSet, varMap, Ident("x"), scopes, 0)) { pt =>
+    parseSuccess(parserRDComparP(lNone, firstSet, varMap, Ident("x"), scopes, 0)) { pt =>
       assertEquals(pt, Ident("x"))
     }
   }
@@ -367,7 +367,7 @@ class ParserShitSpec extends munit.FunSuite {
     val lAnd = TestLexer(Array(SAnd, CBool(true), SAnd, CBool(false)))
     val lNone = TestLexer[Token](Array())
 
-    parseSuccess(parserShitConjunctP(lAnd, firstSet, varMap, Ident("x"), scopes, 0)) { pt =>
+    parseSuccess(parserRDConjunctP(lAnd, firstSet, varMap, Ident("x"), scopes, 0)) { pt =>
       assertEquals(pt,
         Application(
           Application(
@@ -385,7 +385,7 @@ class ParserShitSpec extends munit.FunSuite {
       )
     }
 
-    parseSuccess(parserShitConjunctP(lNone, firstSet, varMap, Ident("x"), scopes, 0)) { pt =>
+    parseSuccess(parserRDConjunctP(lNone, firstSet, varMap, Ident("x"), scopes, 0)) { pt =>
       assertEquals(pt, Ident("x"))
     }
   }
@@ -397,7 +397,7 @@ class ParserShitSpec extends munit.FunSuite {
     val lOr = TestLexer(Array(SOr, CBool(true), SOr, CBool(false)))
     val lNone = TestLexer[Token](Array())
 
-    parseSuccess(parserShitOpExprP(lOr, firstSet, varMap, Ident("x"), scopes, 0)) { pt =>
+    parseSuccess(parserRDOpExprP(lOr, firstSet, varMap, Ident("x"), scopes, 0)) { pt =>
       assertEquals(pt,
         Application(
           Application(
@@ -415,7 +415,7 @@ class ParserShitSpec extends munit.FunSuite {
       )
     }
 
-    parseSuccess(parserShitOpExprP(lNone, firstSet, varMap, Ident("x"), scopes, 0)) { pt =>
+    parseSuccess(parserRDOpExprP(lNone, firstSet, varMap, Ident("x"), scopes, 0)) { pt =>
       assertEquals(pt, Ident("x"))
     }
   }
@@ -428,11 +428,11 @@ class ParserShitSpec extends munit.FunSuite {
     val lSingleItemList = TestLexer(Array(CNum(1)))
     val lMultipleItems = TestLexer(Array(CNum(1), KColon, CBool(true), KColon, CNil))
 
-    parseSuccess(parserShitListExpr(lSingleItemList, firstSet, varMap, scopes, 0)) { pt =>
+    parseSuccess(parserRDListExpr(lSingleItemList, firstSet, varMap, scopes, 0)) { pt =>
       assertEquals(pt, Const(Constant.Num(1)))
     }
 
-    parseSuccess(parserShitListExpr(lMultipleItems, firstSet, varMap, scopes, 0)) { pt =>
+    parseSuccess(parserRDListExpr(lMultipleItems, firstSet, varMap, scopes, 0)) { pt =>
       assertEquals(pt,
         Application(
           Application(
@@ -458,7 +458,7 @@ class ParserShitSpec extends munit.FunSuite {
     val lMultipleItems = TestLexer(Array(CNum(1), KColon, CBool(true), KColon, CNil))
     val lCondition = TestLexer(Array(KIf, CBool(true), KThen, CBool(false), KElse, CBool(true)))
 
-    parseSuccess(parserShitCondExpr(lMultipleItems, firstSet, varMap, scopes, 0)) { pt =>
+    parseSuccess(parserRDCondExpr(lMultipleItems, firstSet, varMap, scopes, 0)) { pt =>
       assertEquals(pt,
         Application(
           Application(
@@ -476,7 +476,7 @@ class ParserShitSpec extends munit.FunSuite {
       )
     }
 
-    parseSuccess(parserShitCondExpr(lCondition, firstSet, varMap, scopes, 0)) { pt =>
+    parseSuccess(parserRDCondExpr(lCondition, firstSet, varMap, scopes, 0)) { pt =>
       assertEquals(pt,
         Application(
           Application(
@@ -497,7 +497,7 @@ class ParserShitSpec extends munit.FunSuite {
     val scopes: Scopes = mutable.ArrayBuffer()
 
     val l = TestLexer(Array(Id("x"), Id("y"), Id("z"), SEqual, Id("x"), SPlus, Id("y"), SDiv, Id("z")))
-    parseSuccess(parserShitAbstraction(l, firstSet, varMap, scopes, 0, 1)) { v =>
+    parseSuccess(parserRDAbstraction(l, firstSet, varMap, scopes, 0, 1)) { v =>
       val (pt, al): (ParseTree, Array[String]) = v
       assert(al.sameElements(Array("1x", "1y", "1z")))
       assertEquals(pt,
@@ -523,7 +523,7 @@ class ParserShitSpec extends munit.FunSuite {
     val scopes: Scopes = mutable.ArrayBuffer()
 
     val l = TestLexer(Array(KDef, Id("id"), Id("x"), SEqual, Id("x"), KDef, Id("id2"), Id("y"), SEqual, Id("y")))
-    parseSuccess(parserShitFuncDefsP(l, firstSet, varMap, scopes)) { _ =>
+    parseSuccess(parserRDFuncDefsP(l, firstSet, varMap, scopes)) { _ =>
       assertEquals(varMap.values.size, 2)
     }
   }
@@ -533,7 +533,7 @@ class ParserShitSpec extends munit.FunSuite {
     val scopes: Scopes = mutable.ArrayBuffer()
 
     val l = TestLexer(Array(KWhere, Id("id"), Id("x"), SEqual, Id("x"), KSemicolon, Id("id2"), Id("y"), SEqual, Id("y")))
-    parseSuccess(parserShitExprP(l, firstSet, varMap, scopes, 0)) { _ =>
+    parseSuccess(parserRDExprP(l, firstSet, varMap, scopes, 0)) { _ =>
       assertEquals(varMap.values.size, 2)
     }
   }
@@ -543,12 +543,12 @@ class ParserShitSpec extends munit.FunSuite {
     val scopes: Scopes = mutable.ArrayBuffer()
 
     val lEmpty = TestLexer(Array(KCloseBracket))
-    parseSuccess(parserShitListP(lEmpty, firstSet, varMap, scopes, 0)) { pt =>
+    parseSuccess(parserRDListP(lEmpty, firstSet, varMap, scopes, 0)) { pt =>
       assertEquals(pt, Const(Constant.Nil))
     }
 
     val lSingle = TestLexer(Array(CNum(1), KCloseBracket))
-    parseSuccess(parserShitListP(lSingle, firstSet, varMap, scopes, 0)) { pt =>
+    parseSuccess(parserRDListP(lSingle, firstSet, varMap, scopes, 0)) { pt =>
       assertEquals(pt,
         Application(
           Application(
@@ -561,7 +561,7 @@ class ParserShitSpec extends munit.FunSuite {
     }
 
     val lMultiple = TestLexer(Array(CNum(1), KComma, CBool(true), KComma, CString("test"), KCloseBracket))
-    parseSuccess(parserShitListP(lMultiple, firstSet, varMap, scopes, 0)) { pt =>
+    parseSuccess(parserRDListP(lMultiple, firstSet, varMap, scopes, 0)) { pt =>
       assertEquals(pt,
         Application(
           Application(
@@ -591,7 +591,7 @@ class ParserShitSpec extends munit.FunSuite {
     val scopes: Scopes = mutable.ArrayBuffer()
 
     val l = TestLexer(Array(KDef, Id("id"), Id("x"), SEqual, Id("x"), KDef, Id("id2"), Id("y"), SEqual, Id("y"), KDot, Id("id2"), Id("x"), KWhere, Id("x"), SEqual, CNum(42)))
-    parseSuccess(parserShitSystem(l, firstSet, varMap, scopes)) { pt =>
+    parseSuccess(parserRDSystem(l, firstSet, varMap, scopes)) { pt =>
       assertEquals(varMap.values.size, 3)
       assertEquals(pt,
         Application(
