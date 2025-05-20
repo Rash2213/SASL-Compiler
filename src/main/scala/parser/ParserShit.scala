@@ -26,6 +26,8 @@ object ParserShit:
   val gen: ParserGenerator[Token, NonTerminal] = ParserGenerator()
 
 type VariableMap = mutable.Map[String, (ParseTree, Array[String])]
+case class ScopeEntry(parent: Int)
+type Scopes = mutable.ArrayBuffer[ScopeEntry]
 
 import ParseTree.*
 import Constant.*
@@ -38,8 +40,10 @@ import Constant.*
 def parserShitSystem(
                       lexer: PeekIterator[Token],
                       first: ParserShit.gen.FirstMap,
-                      variableMap: mutable.Map[String, ParseTree]
+                      variableMap: VariableMap,
+                      scopes: Scopes,
                     ): Either[ParseError, ParseTree] = {
+  scopes.addOne(ScopeEntry(0))
   lexer.peek() match {
     case Some(t) =>
       if (t.ordinal == KDef.ordinal) {
@@ -47,16 +51,18 @@ def parserShitSystem(
         lexer.peek() match {
           case Some(Id(s)) =>
             lexer.next()
-            val pta = parserShitAbstraction(lexer, first, variableMap) match {
+            scopes.addOne(ScopeEntry(0))
+            val scopeA = scopes.length-1
+            val pta = parserShitAbstraction(lexer, first, variableMap, scopes, 0, scopeA) match {
               case Right(pt) => pt
               case Left(e) => return Left(e)
             }
-            variableMap(s) = pta._1
-            parserShitExprP(lexer, first, variableMap) match {
+            variableMap("0" + s) = pta
+            parserShitExprP(lexer, first, variableMap, scopes, 0) match {
               case Right(_) =>
               case Left(e) => return Left(e)
             }
-            parserShitFuncDefsP(lexer, first, variableMap) match {
+            parserShitFuncDefsP(lexer, first, variableMap, scopes) match {
               case Right(_) =>
               case Left(e) => return Left(e)
             }
@@ -65,11 +71,11 @@ def parserShitSystem(
               case Some(_) => return Left(ParseError.ToDo)
               case None => return Left(ParseError.ToDo)
             }
-            val ptc = parserShitCondExpr(lexer, first, variableMap) match {
+            val ptc = parserShitCondExpr(lexer, first, variableMap, scopes, 0) match {
               case Right(pt) => pt
               case Left(e) => return Left(e)
             }
-            parserShitExprP(lexer, first, variableMap) match {
+            parserShitExprP(lexer, first, variableMap, scopes, 0) match {
               case Right(_) =>
               case Left(e) => return Left(e)
             }
@@ -78,11 +84,11 @@ def parserShitSystem(
           case None => Left(ParseError.ToDo)
         }
       } else if (first(CondExpr.ordinal).map(v => v.ordinal).contains(t.ordinal)) {
-        val ptc = parserShitCondExpr(lexer, first, variableMap) match {
+        val ptc = parserShitCondExpr(lexer, first, variableMap, scopes, 0) match {
           case Right(pt) => pt
           case Left(e) => return Left(e)
         }
-        parserShitExprP(lexer, first, variableMap) match {
+        parserShitExprP(lexer, first, variableMap, scopes, 0) match {
           case Right(_) =>
           case Left(e) => return Left(e)
         }
@@ -99,7 +105,8 @@ def parserShitSystem(
 def parserShitFuncDefsP(
                          lexer: PeekIterator[Token],
                          first: ParserShit.gen.FirstMap,
-                         variableMap: mutable.Map[String, ParseTree],
+                         variableMap: VariableMap,
+                         scopes: Scopes,
                        ): Either[ParseError, Unit] = {
   lexer.peek() match {
     case Some(t) =>
@@ -111,16 +118,18 @@ def parserShitFuncDefsP(
       lexer.peek() match {
         case Some(Id(s)) =>
           lexer.next()
-          val pta = parserShitAbstraction(lexer, first, variableMap) match {
+          scopes.addOne(ScopeEntry(0))
+          val scopeA = scopes.length-1
+          val pta = parserShitAbstraction(lexer, first, variableMap, scopes, 0, scopeA) match {
             case Right(pt) => pt
             case Left(e) => return Left(e)
           }
-          variableMap(s) = pta._1
-          parserShitExprP(lexer, first, variableMap) match {
+          variableMap("0" + s) = pta
+          parserShitExprP(lexer, first, variableMap, scopes, 0) match {
             case Right(_) =>
             case Left(e) => return Left(e)
           }
-          parserShitFuncDefsP(lexer, first, variableMap)
+          parserShitFuncDefsP(lexer, first, variableMap, scopes)
         case _ => Left(ParseError.ToDo)
       }
     case None => Right(())
@@ -131,8 +140,12 @@ def parserShitFuncDefsP(
 def parserShitExprP(
                      lexer: PeekIterator[Token],
                      first: ParserShit.gen.FirstMap,
-                     variableMap: mutable.Map[String, ParseTree],
+                     variableMap: VariableMap,
+                     scopes: Scopes,
+                     parentScope: Int,
                    ): Either[ParseError, Unit] = {
+  scopes.addOne(ScopeEntry(parentScope))
+  val scope = scopes.length-1
   lexer.peek() match {
     case Some(t) =>
       if (t.ordinal == KWhere.ordinal) {
@@ -143,13 +156,14 @@ def parserShitExprP(
       lexer.peek() match {
         case Some(Id(s)) =>
           lexer.next()
-          val pta = parserShitAbstraction(lexer, first, variableMap) match {
+          scopes.addOne(ScopeEntry(scope))
+          val scopeA = scopes.length-1
+          val pta = parserShitAbstraction(lexer, first, variableMap, scopes, parentScope, scopeA) match {
             case Right(pt) => pt
             case Left(e) => return Left(e)
           }
-          // ToDo: add scope to name
-          variableMap(s) = pta._1
-          parserShitDefsP(lexer, first, variableMap)
+          variableMap(scope.toString + s) = pta
+          parserShitDefsP(lexer, first, variableMap, scopes, scope)
         case _ => Left(ParseError.ToDo)
       }
     case None => Right(())
@@ -161,7 +175,10 @@ def parserShitExprP(
 def parserShitAbstraction(
                            lexer: PeekIterator[Token],
                            first: ParserShit.gen.FirstMap,
-                           variableMap: mutable.Map[String, ParseTree],
+                           variableMap: VariableMap,
+                           scopes: Scopes,
+                           parentScope: Int,
+                           abstractionScope: Int,
                            al: Array[String] = Array(),
                          ): Either[ParseError, (ParseTree, Array[String])] = {
   var argList: Array[String] = al
@@ -170,15 +187,14 @@ def parserShitAbstraction(
       t match {
         case SEqual =>
           lexer.next()
-          parserShitCondExpr(lexer, first, variableMap) match {
+          parserShitCondExpr(lexer, first, variableMap, scopes, parentScope) match {
             case Right(pt) => Right(pt, argList)
             case Left(e) => Left(e)
           }
         case Id(s) =>
-          // ToDo: add scope prefix
-          argList = argList.appended(s)
+          argList = argList.appended(abstractionScope.toString + s)
           lexer.next()
-          parserShitAbstraction(lexer, first, variableMap, argList)
+          parserShitAbstraction(lexer, first, variableMap, scopes, parentScope, abstractionScope, argList)
         case _ => Left(ParseError.ToDo)
       }
     case None => Left(ParseError.ToDo)
@@ -189,7 +205,9 @@ def parserShitAbstraction(
 def parserShitDefsP(
                      lexer: PeekIterator[Token],
                      first: ParserShit.gen.FirstMap,
-                     variableMap: mutable.Map[String, ParseTree]
+                     variableMap: VariableMap,
+                     scopes: Scopes,
+                     scope: Int,
                    ): Either[ParseError, Unit] = {
   lexer.peek() match {
     case Some(t) =>
@@ -197,12 +215,13 @@ def parserShitDefsP(
         lexer.next()
         lexer.peek() match {
           case Some(Id(s)) =>
-            val pta = parserShitAbstraction(lexer, first, variableMap) match {
+            scopes.addOne(ScopeEntry(scope))
+            val scopeA = scopes.length-1
+            val pta = parserShitAbstraction(lexer, first, variableMap, scopes, scope, scopeA) match {
               case Right(pt) => pt
               case Left(e) => return Left(e)
             }
-            // ToDo: add scope to name
-            variableMap(s) = pta._1
+            variableMap(scope.toString + s) = pta
             Right(())
           case _ => Left(ParseError.ToDo)
         }
@@ -217,17 +236,19 @@ def parserShitDefsP(
 def parserShitCondExpr(
                         lexer: PeekIterator[Token],
                         first: ParserShit.gen.FirstMap,
-                        variableMap: mutable.Map[String, ParseTree],
+                        variableMap: VariableMap,
+                        scopes: Scopes,
+                        parentScope: Int,
                       ): Either[ParseError, ParseTree] = {
   lexer.peek() match {
     case Some(t) =>
       if (t.ordinal == KIf.ordinal) {
         lexer.next()
-        val ptc = parserShitCondExpr(lexer, first, variableMap) match {
+        val ptc = parserShitCondExpr(lexer, first, variableMap, scopes, parentScope) match {
           case Right(pt) => pt
           case Left(e) => return Left(e)
         }
-        parserShitExprP(lexer, first, variableMap) match {
+        parserShitExprP(lexer, first, variableMap, scopes, parentScope) match {
           case Right(_) =>
           case Left(e) => return Left(e)
         }
@@ -236,7 +257,7 @@ def parserShitCondExpr(
           case Some(_) => return Left(ParseError.ToDo)
           case None => return Left(ParseError.ToDo)
         }
-        val ptt = parserShitCondExpr(lexer, first, variableMap) match {
+        val ptt = parserShitCondExpr(lexer, first, variableMap, scopes, parentScope) match {
           case Right(pt) => pt
           case Left(e) => return Left(e)
         }
@@ -245,7 +266,7 @@ def parserShitCondExpr(
           case Some(_) => return Left(ParseError.ToDo)
           case None => return Left(ParseError.ToDo)
         }
-        val pte = parserShitCondExpr(lexer, first, variableMap) match {
+        val pte = parserShitCondExpr(lexer, first, variableMap, scopes, parentScope) match {
           case Right(pt) => pt
           case Left(e) => return Left(e)
         }
@@ -262,7 +283,7 @@ def parserShitCondExpr(
           )
         )
       } else if (first(ListExpr.ordinal).map(v => v.ordinal).contains(t.ordinal)) {
-        parserShitListExpr(lexer, first, variableMap)
+        parserShitListExpr(lexer, first, variableMap, scopes, parentScope)
       } else {
         Left(ParseError.ToDo)
       }
@@ -273,35 +294,37 @@ def parserShitCondExpr(
 def parserShitListExpr(
                         lexer: PeekIterator[Token],
                         first: ParserShit.gen.FirstMap,
-                        variableMap: mutable.Map[String, ParseTree],
+                        variableMap: VariableMap,
+                        scopes: Scopes,
+                        scope: Int,
                       ): Either[ParseError, ParseTree] = {
   lexer.peek() match {
     case Some(t) =>
-      val f = parserShitFactor(lexer, first, variableMap) match {
+      val f = parserShitFactor(lexer, first, variableMap, scopes, scope) match {
         case Right(pt) => pt
         case Left(e) => return Left(e)
       }
-      val mpt = parserShitMulP(lexer, first, variableMap, f) match {
+      val mpt = parserShitMulP(lexer, first, variableMap, f, scopes, scope) match {
         case Right(pt) => pt
         case Left(e) => return Left(e)
       }
-      val apt = parserShitAddP(lexer, first, variableMap, mpt) match {
+      val apt = parserShitAddP(lexer, first, variableMap, mpt, scopes, scope) match {
         case Right(pt) => pt
         case Left(e) => return Left(e)
       }
-      val cpt = parserShitComparP(lexer, first, variableMap, apt) match {
+      val cpt = parserShitComparP(lexer, first, variableMap, apt, scopes, scope) match {
         case Right(pt) => pt
         case Left(e) => return Left(e)
       }
-      val cjpt = parserShitConjunctP(lexer, first, variableMap, cpt) match {
+      val cjpt = parserShitConjunctP(lexer, first, variableMap, cpt, scopes, scope) match {
         case Right(pt) => pt
         case Left(e) => return Left(e)
       }
-      val opt = parserShitOpExprP(lexer, first, variableMap, cjpt) match {
+      val opt = parserShitOpExprP(lexer, first, variableMap, cjpt, scopes, scope) match {
         case Right(pt) => pt
         case Left(e) => return Left(e)
       }
-      parserShitListExprP(lexer, first, variableMap, opt)
+      parserShitListExprP(lexer, first, variableMap, opt, scopes, scope)
     case None => Left(ParseError.ToDo)
   }
 }
@@ -310,14 +333,16 @@ def parserShitListExpr(
 def parserShitListExprP(
                          lexer: PeekIterator[Token],
                          first: ParserShit.gen.FirstMap,
-                         variableMap: mutable.Map[String, ParseTree],
+                         variableMap: VariableMap,
                          lhs: ParseTree,
+                         scopes: Scopes,
+                         scope: Int,
                        ): Either[ParseError, ParseTree] = {
   lexer.peek() match {
     case Some(t) =>
       if (t.ordinal == KColon.ordinal) {
         lexer.next()
-        val rhs = parserShitListExpr(lexer, first, variableMap) match {
+        val rhs = parserShitListExpr(lexer, first, variableMap, scopes, scope) match {
           case Right(pt) => pt
           case Left(e) => return Left(e)
         }
@@ -341,30 +366,32 @@ def parserShitListExprP(
 def parserShitOpExprP(
                        lexer: PeekIterator[Token],
                        first: ParserShit.gen.FirstMap,
-                       variableMap: mutable.Map[String, ParseTree],
+                       variableMap: VariableMap,
                        lhs: ParseTree,
+                       scopes: Scopes,
+                       scope: Int,
                      ): Either[ParseError, ParseTree] = {
   lexer.peek() match {
     case Some(t) =>
       if (t.ordinal == SOr.ordinal) {
         lexer.next()
-        val f = parserShitFactor(lexer, first, variableMap) match {
+        val f = parserShitFactor(lexer, first, variableMap, scopes, scope) match {
           case Right(pt) => pt
           case Left(e) => return Left(e)
         }
-        val mpt = parserShitMulP(lexer, first, variableMap, f) match {
+        val mpt = parserShitMulP(lexer, first, variableMap, f, scopes, scope) match {
           case Right(pt) => pt
           case Left(e) => return Left(e)
         }
-        val apt = parserShitAddP(lexer, first, variableMap, mpt) match {
+        val apt = parserShitAddP(lexer, first, variableMap, mpt, scopes, scope) match {
           case Right(pt) => pt
           case Left(e) => return Left(e)
         }
-        val cpt = parserShitComparP(lexer, first, variableMap, apt) match {
+        val cpt = parserShitComparP(lexer, first, variableMap, apt, scopes, scope) match {
           case Right(pt) => pt
           case Left(e) => return Left(e)
         }
-        val cjpt = parserShitConjunctP(lexer, first, variableMap, cpt) match {
+        val cjpt = parserShitConjunctP(lexer, first, variableMap, cpt, scopes, scope) match {
           case Right(pt) => pt
           case Left(e) => return Left(e)
         }
@@ -375,7 +402,7 @@ def parserShitOpExprP(
           ),
           cjpt
         )
-        parserShitOpExprP(lexer, first, variableMap, pt)
+        parserShitOpExprP(lexer, first, variableMap, pt, scopes, scope)
       } else {
         Right(lhs)
       }
@@ -389,26 +416,28 @@ def parserShitOpExprP(
 def parserShitConjunctP(
                          lexer: PeekIterator[Token],
                          first: ParserShit.gen.FirstMap,
-                         variableMap: mutable.Map[String, ParseTree],
+                         variableMap: VariableMap,
                          lhs: ParseTree,
+                         scopes: Scopes,
+                         scope: Int,
                        ): Either[ParseError, ParseTree] = {
   lexer.peek() match {
     case Some(t) =>
       if (t.ordinal == SAnd.ordinal) {
         lexer.next()
-        val f = parserShitFactor(lexer, first, variableMap) match {
+        val f = parserShitFactor(lexer, first, variableMap, scopes, scope) match {
           case Right(pt) => pt
           case Left(e) => return Left(e)
         }
-        val mpt = parserShitMulP(lexer, first, variableMap, f) match {
+        val mpt = parserShitMulP(lexer, first, variableMap, f, scopes, scope) match {
           case Right(pt) => pt
           case Left(e) => return Left(e)
         }
-        val apt = parserShitAddP(lexer, first, variableMap, mpt) match {
+        val apt = parserShitAddP(lexer, first, variableMap, mpt, scopes, scope) match {
           case Right(pt) => pt
           case Left(e) => return Left(e)
         }
-        val cpt = parserShitComparP(lexer, first, variableMap, apt) match {
+        val cpt = parserShitComparP(lexer, first, variableMap, apt, scopes, scope) match {
           case Right(pt) => pt
           case Left(e) => return Left(e)
         }
@@ -419,7 +448,7 @@ def parserShitConjunctP(
           ),
           cpt
         )
-        parserShitConjunctP(lexer, first, variableMap, pt)
+        parserShitConjunctP(lexer, first, variableMap, pt, scopes, scope)
       } else {
         Right(lhs)
       }
@@ -437,23 +466,25 @@ def parserShitConjunctP(
 def parserShitComparP(
                        lexer: PeekIterator[Token],
                        first: ParserShit.gen.FirstMap,
-                       variableMap: mutable.Map[String, ParseTree],
+                       variableMap: VariableMap,
                        lhs: ParseTree,
+                       scopes: Scopes,
+                       scope: Int,
                      ): Either[ParseError, ParseTree] = {
   lexer.peek() match {
     case Some(t) =>
       t match {
         case t @ (SEqual | SNotEqual | SLess | SGreater | SLessEqual | SGreaterEqual) =>
           lexer.next()
-          val f = parserShitFactor(lexer, first, variableMap) match {
+          val f = parserShitFactor(lexer, first, variableMap, scopes, scope) match {
             case Right(pt) => pt
             case Left(e) => return Left(e)
           }
-          val mpt = parserShitMulP(lexer, first, variableMap, f) match {
+          val mpt = parserShitMulP(lexer, first, variableMap, f, scopes, scope) match {
             case Right(pt) => pt
             case Left(e) => return Left(e)
           }
-          val apt = parserShitAddP(lexer, first, variableMap, mpt) match {
+          val apt = parserShitAddP(lexer, first, variableMap, mpt, scopes, scope) match {
             case Right(pt) => pt
             case Left(e) => return Left(e)
           }
@@ -477,7 +508,7 @@ def parserShitComparP(
             ),
             apt
           )
-          parserShitComparP(lexer, first, variableMap, pt)
+          parserShitComparP(lexer, first, variableMap, pt, scopes, scope)
         case _ =>
           Right(lhs)
       }
@@ -492,19 +523,21 @@ def parserShitComparP(
 def parserShitAddP(
                     lexer: PeekIterator[Token],
                     first: ParserShit.gen.FirstMap,
-                    variableMap: mutable.Map[String, ParseTree],
+                    variableMap: VariableMap,
                     lhs: ParseTree,
+                    scopes: Scopes,
+                    scope: Int,
                   ): Either[ParseError, ParseTree] = {
   lexer.peek() match {
     case Some(t) =>
       t match {
         case SPlus =>
           lexer.next()
-          val f = parserShitFactor(lexer, first, variableMap) match {
+          val f = parserShitFactor(lexer, first, variableMap, scopes, scope) match {
             case Right(pt) => pt
             case Left(e) => return Left(e)
           }
-          val mpt = parserShitMulP(lexer, first, variableMap, f) match {
+          val mpt = parserShitMulP(lexer, first, variableMap, f, scopes, scope) match {
             case Right(pt) => pt
             case Left(e) => return Left(e)
           }
@@ -515,14 +548,14 @@ def parserShitAddP(
             ),
             mpt
           )
-          parserShitAddP(lexer, first, variableMap, pt)
+          parserShitAddP(lexer, first, variableMap, pt, scopes, scope)
         case SMinus =>
           lexer.next()
-          val f = parserShitFactor(lexer, first, variableMap) match {
+          val f = parserShitFactor(lexer, first, variableMap, scopes, scope) match {
             case Right(pt) => pt
             case Left(e) => return Left(e)
           }
-          val mpt = parserShitMulP(lexer, first, variableMap, f) match {
+          val mpt = parserShitMulP(lexer, first, variableMap, f, scopes, scope) match {
             case Right(pt) => pt
             case Left(e) => return Left(e)
           }
@@ -533,7 +566,7 @@ def parserShitAddP(
             ),
             mpt
           )
-          parserShitAddP(lexer, first, variableMap, pt)
+          parserShitAddP(lexer, first, variableMap, pt, scopes, scope)
         case _ =>
           Right(lhs)
       }
@@ -548,15 +581,17 @@ def parserShitAddP(
 def parserShitMulP(
                     lexer: PeekIterator[Token],
                     first: ParserShit.gen.FirstMap,
-                    variableMap: mutable.Map[String, ParseTree],
+                    variableMap: VariableMap,
                     lhs: ParseTree,
+                    scopes: Scopes,
+                    scope: Int,
                   ): Either[ParseError, ParseTree] = {
   lexer.peek() match {
     case Some(t) =>
       t match {
         case SMul =>
           lexer.next()
-          val f = parserShitFactor(lexer, first, variableMap) match {
+          val f = parserShitFactor(lexer, first, variableMap, scopes, scope) match {
             case Right(pt) => pt
             case Left(e) => return Left(e)
           }
@@ -567,10 +602,10 @@ def parserShitMulP(
             ),
             f
           )
-          parserShitMulP(lexer, first, variableMap, pt)
+          parserShitMulP(lexer, first, variableMap, pt, scopes, scope)
         case SDiv =>
           lexer.next()
-          val f = parserShitFactor(lexer, first, variableMap) match {
+          val f = parserShitFactor(lexer, first, variableMap, scopes, scope) match {
             case Right(pt) => pt
             case Left(e) => return Left(e)
           }
@@ -581,7 +616,7 @@ def parserShitMulP(
             ),
             f
           )
-          parserShitMulP(lexer, first, variableMap, pt)
+          parserShitMulP(lexer, first, variableMap, pt, scopes, scope)
         case _ =>
           Right(lhs)
       }
@@ -596,18 +631,20 @@ def parserShitMulP(
 def parserShitFactor(
                       lexer: PeekIterator[Token],
                       first: ParserShit.gen.FirstMap,
-                      variableMap: mutable.Map[String, ParseTree]
+                      variableMap: VariableMap,
+                      scopes: Scopes,
+                      scope: Int,
                     ): Either[ParseError, ParseTree] = {
   lexer.peek() match {
     case Some(t) =>
       t match {
         case SPlus =>
           lexer.next()
-          val s = parserShitSimple(lexer, first, variableMap) match {
+          val s = parserShitSimple(lexer, first, variableMap, scopes, scope) match {
             case Right(pt) => pt
             case Left(e) => return Left(e)
           }
-          val cp = parserShitCombP(lexer, first, variableMap, s) match {
+          val cp = parserShitCombP(lexer, first, variableMap, scopes, scope, s) match {
             case Right(pt) => pt
             case Left(e) => return Left(e)
           }
@@ -615,11 +652,11 @@ def parserShitFactor(
           return Right(cp)
         case SMinus =>
           lexer.next()
-          val s = parserShitSimple(lexer, first, variableMap) match {
+          val s = parserShitSimple(lexer, first, variableMap, scopes, scope) match {
             case Right(pt) => pt
             case Left(e) => return Left(e)
           }
-          val cp = parserShitCombP(lexer, first, variableMap, s) match {
+          val cp = parserShitCombP(lexer, first, variableMap, scopes, scope, s) match {
             case Right(pt) => pt
             case Left(e) => return Left(e)
           }
@@ -631,11 +668,11 @@ def parserShitFactor(
           )
         case SNot =>
           lexer.next()
-          val s = parserShitSimple(lexer, first, variableMap) match {
+          val s = parserShitSimple(lexer, first, variableMap, scopes, scope) match {
             case Right(pt) => pt
             case Left(e) => return Left(e)
           }
-          val cp = parserShitCombP(lexer, first, variableMap, s) match {
+          val cp = parserShitCombP(lexer, first, variableMap, scopes, scope, s) match {
             case Right(pt) => pt
             case Left(e) => return Left(e)
           }
@@ -648,11 +685,11 @@ def parserShitFactor(
         case _ =>
       }
       if(first(Simple.ordinal).map(v => v.ordinal).contains(t.ordinal)) {
-        val s = parserShitSimple(lexer, first, variableMap) match {
+        val s = parserShitSimple(lexer, first, variableMap, scopes, scope) match {
           case Right(pt) => pt
           case Left(e) => return Left(e)
         }
-        val cp = parserShitCombP(lexer, first, variableMap, s) match {
+        val cp = parserShitCombP(lexer, first, variableMap, scopes, scope, s) match {
           case Right(pt) => pt
           case Left(e) => return Left(e)
         }
@@ -671,13 +708,15 @@ def parserShitFactor(
 def parserShitCombP(
                      lexer: PeekIterator[Token],
                      first: ParserShit.gen.FirstMap,
-                     variableMap: mutable.Map[String, ParseTree],
+                     variableMap: VariableMap,
+                     scopes: Scopes,
+                     scope: Int,
                      ptSoFar: ParseTree,
                    ): Either[ParseError, ParseTree] = {
   lexer.peek() match {
     case Some(t) =>
       if (first(Simple.ordinal).map(v => v.ordinal).contains(t.ordinal)) {
-        val s = parserShitSimple(lexer, first, variableMap) match {
+        val s = parserShitSimple(lexer, first, variableMap, scopes, scope) match {
           case Right(pt) => pt
           case Left(e) => return Left(e)
         }
@@ -685,6 +724,8 @@ def parserShitCombP(
           lexer,
           first,
           variableMap,
+          scopes,
+          scope,
           Application(
             ptSoFar,
             s
@@ -708,15 +749,16 @@ def parserShitCombP(
 def parserShitSimple(
                       lexer: PeekIterator[Token],
                       first: ParserShit.gen.FirstMap,
-                      variableMap: mutable.Map[String, ParseTree]
+                      variableMap: VariableMap,
+                      scopes: Scopes,
+                      scope: Int,
                     ): Either[ParseError, ParseTree] = {
   lexer.peek() match {
     case Some(t) =>
       t match {
         case Id(s) =>
-          // ToDo: Scoping
           lexer.next()
-          Right(Ident(s))
+          Right(Ident(scope.toString + s))
         case CNum(n) =>
           lexer.next()
           Right(Const(Num(n)))
@@ -731,14 +773,14 @@ def parserShitSimple(
           Right(Const(Nil))
         case KOpenBracket =>
           lexer.next()
-          parserShitListP(lexer, first, variableMap)
+          parserShitListP(lexer, first, variableMap, scopes, scope)
         case KOpenParen =>
           lexer.next()
-          val ptc = parserShitCondExpr(lexer, first, variableMap) match {
+          val ptc = parserShitCondExpr(lexer, first, variableMap, scopes, scope) match {
             case Right(pt) => pt
             case Left(e) => return Left(e)
           }
-          parserShitExprP(lexer, first, variableMap) match {
+          parserShitExprP(lexer, first, variableMap, scopes, scope) match {
             case Right(_) =>
             case Left(e) => return Left(e)
           }
@@ -760,7 +802,9 @@ def parserShitSimple(
 def parserShitListP(
                      lexer: PeekIterator[Token],
                      first: ParserShit.gen.FirstMap,
-                     variableMap: mutable.Map[String, ParseTree]
+                     variableMap: VariableMap,
+                     scopes: Scopes,
+                     scope: Int,
                    ): Either[ParseError, ParseTree] = {
   lexer.peek() match {
     case Some(t) =>
@@ -768,11 +812,11 @@ def parserShitListP(
         lexer.next()
         Right(Const(Nil))
       } else if (first(CondExpr.ordinal).map(v => v.ordinal).contains(t.ordinal)) {
-        val ptc = parserShitCondExpr(lexer, first, variableMap) match {
+        val ptc = parserShitCondExpr(lexer, first, variableMap, scopes, scope) match {
           case Right(pt) => pt
           case Left(e) => return Left(e)
         }
-        parserShitExprP(lexer, first, variableMap) match {
+        parserShitExprP(lexer, first, variableMap, scopes, scope) match {
           case Right(_) =>
           case Left(e) => return Left(e)
         }
@@ -787,7 +831,7 @@ def parserShitListP(
           ),
           parserShitListElemsP(lexer, first, variableMap)
         )*/
-        val pt = parserShitListElemsP(lexer, first, variableMap) match {
+        val pt = parserShitListElemsP(lexer, first, variableMap, scopes, scope) match {
           case Left(e) => return Left(e)
           case Right(pt) => Application(
             Application(
@@ -837,22 +881,24 @@ def parserShitListP(
 def parserShitListElemsP(
                           lexer: PeekIterator[Token],
                           first: ParserShit.gen.FirstMap,
-                          variableMap: mutable.Map[String, ParseTree],
+                          variableMap: VariableMap,
+                          scopes: Scopes,
+                          scope: Int
                           //lhs: ParseTree,
                         ): Either[ParseError, ParseTree] = {
   lexer.peek() match {
     case Some(t) =>
       if (t.ordinal == KComma.ordinal) {
         lexer.next()
-        val ptc = parserShitCondExpr(lexer, first, variableMap) match {
+        val ptc = parserShitCondExpr(lexer, first, variableMap, scopes, scope) match {
           case Right(pt) => pt
           case Left(e) => return Left(e)
         }
-        parserShitExprP(lexer, first, variableMap) match {
+        parserShitExprP(lexer, first, variableMap, scopes, scope) match {
           case Right(_) =>
           case Left(e) => return Left(e)
         }
-        parserShitListElemsP(lexer, first, variableMap) match {
+        parserShitListElemsP(lexer, first, variableMap, scopes, scope) match {
           case Left(e) => Left(e)
           case Right(pt) => Right(Application(
             Application(
