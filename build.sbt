@@ -8,7 +8,8 @@ ThisBuild / organizationName := "example"
 lazy val root = (project in file("."))
   .settings(
     name := "compiler-sasl-scala",
-    libraryDependencies += munit % Test
+    libraryDependencies += munit % Test ,
+    libraryDependencies += "com.monovore" %% "decline-effect" % "2.5.0"
   )
 
 // See https://www.scala-sbt.org/1.x/docs/Using-Sonatype.html for instructions on how to publish to Sonatype.
