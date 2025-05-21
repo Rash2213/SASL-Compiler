@@ -202,6 +202,7 @@ def parserRDAbstraction(
 }
 //  ⟨defs’⟩ → ; id ⟨abstraction⟩ ⟨defs’⟩
 //    | ε
+@tailrec
 def parserRDDefsP(
                    lexer: PeekIterator[Token],
                    first: ParserRD.gen.FirstMap,
@@ -215,6 +216,7 @@ def parserRDDefsP(
         lexer.next()
         lexer.peek() match {
           case Some(Id(s)) =>
+            lexer.next()
             scopes.addOne(ScopeEntry(scope))
             val scopeA = scopes.length-1
             val pta = parserRDAbstraction(lexer, first, variableMap, scopes, scope, scopeA) match {
@@ -222,7 +224,7 @@ def parserRDDefsP(
               case Left(e) => return Left(e)
             }
             variableMap(scope.toString + s) = pta
-            Right(())
+            parserRDDefsP(lexer, first, variableMap, scopes, scope)
           case _ => Left(ParseError.ToDo)
         }
       } else {
