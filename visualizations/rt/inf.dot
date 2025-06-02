@@ -1,0 +1,14 @@
+digraph ReductionTree {
+  node25 [label="Program"];
+  node26 [label="@"];
+  node27 [label="@"];
+  node28 [label="Cons"];
+  node29 [label="1"];
+  node27 -> node28;
+  node27 -> node29;
+  node30 [label=""];
+  node30 -> node26;
+  node26 -> node27;
+  node26 -> node30;
+  node25 -> node26;
+}
