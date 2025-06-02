@@ -9,7 +9,7 @@ import scala.annotation.tailrec
 import scala.collection.mutable
 
 enum Constant:
-  case Num(n: Number)
+  case Num(n: Long)
   case Bool(b: Boolean)
   case Str(s: String)
   case Nil
