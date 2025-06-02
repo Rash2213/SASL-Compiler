@@ -1,13 +1,14 @@
-package parser
+package visualizer
 
-import ParseTree.*
+import parser.ParseTree.*
+import parser.{ParseTree, VariableMap, Constant, ParserGenerator, Scopes, parserRDSystem}
 import cli.{getFilename, readFileBin}
 import lexer.{Lexer, Token}
 import parser.SaslData.{NonTerminal, derMap, emMap}
 
 import scala.collection.mutable
 
-class VisualizerSpec extends munit.FunSuite {
+class VisualizerParseTreeSpec extends munit.FunSuite {
   test("visualization of static parse trees") {
     val pte: ParseTree = Application(
       Ident("null"),
@@ -48,7 +49,7 @@ class VisualizerSpec extends munit.FunSuite {
       Ident("y"),
     ), Array("x", "y"))
 
-    val visualizer = Visualizer()
+    val visualizer = VisualizerParseTree()
     val dse = visualizer.generateDot(pte, vme)
     visualizer.saveDotToFile(dse, "visualizations/exercise.dot")
     println("Parse tree visualization for exercise saved to visualizations/exercise.dot")
@@ -69,7 +70,7 @@ class VisualizerSpec extends munit.FunSuite {
       val scopes: Scopes = mutable.ArrayBuffer()
       parserRDSystem(lexer, firstSet, varMap, scopes) match {
         case Right(pt) =>
-          val visualizer = Visualizer()
+          val visualizer = VisualizerParseTree()
           val d = visualizer.generateDot(pt, varMap)
           val fn = getFilename(file)
           visualizer.saveDotToFile(d, s"visualizations/$fn.dot")

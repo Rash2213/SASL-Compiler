@@ -1,10 +1,11 @@
-package parser
+package visualizer
 
-import ParseTree.*
+import parser.ParseTree.*
+import parser.{ParseTree, Constant, VariableMap}
 
 import scala.collection.mutable
 
-class Visualizer {
+class VisualizerParseTree {
   private var idCounter = 0
   private val sb = new StringBuilder
 
@@ -16,21 +17,6 @@ class Visualizer {
   def visit(pt: ParseTree): String = {
     val id = nextId()
     pt match {
-      /*case Program(definitions, expr) =>
-        sb.append(s"  $id [label=\"Program\"];\n")
-        val exprId = visit(expr)
-        sb.append(s"  $id -> $exprId;\n")
-        for (defn <- definitions) {
-          val defId = nextId()
-          sb.append(s"  $defId [label=\"${defn.name}\"];\n")
-          val bodyId = visit(defn.value)
-          sb.append(s"  $defId -> $bodyId;\n")
-          sb.append(s"  $id -> $defId;\n")
-        }
-      case Abstraction(params, body) =>
-        sb.append(s"""  $id [label="${params.mkString(", ")}"];\n""")
-        val bodyId = visit(body)
-        sb.append(s"  $id -> $bodyId;\n")*/
       case Ident(name) =>
         sb.append(s"""  $id [label="$name"];\n""")
       case Const(Constant.Num(n)) =>
@@ -47,23 +33,6 @@ class Visualizer {
         val rhsId = visit(rhs)
         sb.append(s"  $id -> $lhsId;\n")
         sb.append(s"  $id -> $rhsId;\n")
-      /*case Where(expr, definitions) =>
-        sb.append(s"""  $id [label="Where"];\n""")
-        val exprId = visit(expr)
-        sb.append(s"  $id -> $exprId;\n")
-        for (defn <- definitions) {
-          val defId = nextId()
-          sb.append(s"""  $defId [label="${defn.name}"];\n""")
-          val bodyId = visit(defn.value)
-          sb.append(s"  $defId -> $bodyId;\n")
-          sb.append(s"  $id -> $defId;\n")
-        }
-      case Cons(head, tail) =>
-        sb.append(s"""  $id [label="Cons"];\n""")
-        val headId = visit(head)
-        val tailId = visit(tail)
-        sb.append(s"  $id -> $headId;\n")
-        sb.append(s"  $id -> $tailId;\n")*/
     }
     id
   }

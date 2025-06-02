@@ -1,7 +1,8 @@
 package cli
 
 import lexer.{Lexer, Token}
-import parser.{ParserGenerator, VariableMap, Scopes, parserRDSystem, Visualizer}
+import parser.{ParserGenerator, VariableMap, Scopes, parserRDSystem}
+import visualizer.VisualizerParseTree
 import parser.SaslData.{NonTerminal, derMap, emMap}
 
 import java.io.{FileInputStream, File}
@@ -58,7 +59,7 @@ object SaslCompilerApp extends CommandIOApp(
           val scopes: Scopes = mutable.ArrayBuffer()
           parserRDSystem(lexer, firstSet, varMap, scopes) match {
             case Right(pt) =>
-              val visualizer = Visualizer()
+              val visualizer = VisualizerParseTree()
               val d = visualizer.generateDot(pt, varMap)
               val fn = getFilename(file)
               visualizer.saveDotToFile(d, s"visualizations/$fn.dot")
