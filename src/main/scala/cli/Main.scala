@@ -1,9 +1,11 @@
 package cli
 
 import lexer.{Lexer, Token}
-import parser.{ParserGenerator, VariableMap, Scopes, parserRDSystem}
+import parser.{ParserGenerator, VariableMap, VariableMapUnoptimized, Scopes, parserRDSystem, parserRDUnoptimizedSystem}
 import visualizer.VisualizerParseTree
 import parser.SaslData.{NonTerminal, derMap, emMap}
+import compiler.{CompilerUnoptimized, CompilerError}
+import vm.evalAndPrintUnoptimized
 
 import java.io.{FileInputStream, File}
 
@@ -74,8 +76,29 @@ object SaslCompilerApp extends CommandIOApp(
         IO {
           val raw = readFileBin(file)
           val lexer = Lexer(raw)
-          lexer.foreach(t => println(t))
-          ExitCode.Success
+          val gen: ParserGenerator[Token, NonTerminal] = ParserGenerator()
+          val fr = gen.first(NonTerminal.values.length, derMap, emMap)
+          val varMap: VariableMapUnoptimized = mutable.Map()
+          val scopes: Scopes = mutable.ArrayBuffer()
+          val firstSet = fr._1
+          parserRDUnoptimizedSystem(lexer, firstSet, varMap, scopes) match {
+            case Right(pt) =>
+              val c = CompilerUnoptimized()
+              c.compileProgram(pt, scopes, varMap) match {
+                case Left(e) =>
+                  e match {
+                    case CompilerError.UnresolvedVariable(n) =>
+                      println("Encountered error during compilation: Unresolved variable \"" + n + "\"!")
+                  }
+                  ExitCode.Error
+                case Right(rt) =>
+                  evalAndPrintUnoptimized(rt)
+                  ExitCode.Success
+              }
+            case Left(e) =>
+              println("Encountered error during parsing!")
+              ExitCode.Error
+          }
         }
     }
 }

@@ -4,40 +4,46 @@ import parser.Constant
 
 import scala.collection.mutable
 
-enum ReductionTree:
+enum ReductionTreeUnoptimized:
   case Const(c: Constant)
   case S
   case K
   case I
-  /*case Y
-  case U*/
+  case Y
+  case U
   case Plus
   case Minus
   case Mul
   case Div
+  case Leq
+  case Lt
+  case Geq
+  case Gt
+  case Eq
+  case Neq
   case Cond
   case Cons
   case Hd
   case Tl
-  case Application(var operator: ReductionTree, var operand: ReductionTree)
-  case Pair(hd: ReductionTree, tl: ReductionTree)
+  case Application(var operator: ReductionTreeUnoptimized, var operand: ReductionTreeUnoptimized)
+  case Pair(hd: ReductionTreeUnoptimized, tl: ReductionTreeUnoptimized)
   case Unresolved(name: String)
 
-import ReductionTree.*
+import ReductionTreeUnoptimized.*
 
-enum ReductionResult:
+enum ReductionResultUnoptimized:
   case Const(c: Constant)
   case List(p: Pair)
 
-def reduce(tree: ReductionTree): Either[String, ReductionResult] = {
-  val s: mutable.Stack[ReductionTree] = mutable.Stack()
+def reduceUnoptimized(tree: ReductionTreeUnoptimized): Either[String, ReductionResultUnoptimized] = {
+  val s: mutable.Stack[ReductionTreeUnoptimized] = mutable.Stack()
   s.push(tree)
   while (s.nonEmpty) {
     s.top match {
       case Const(c: Constant) =>
-        return Right(ReductionResult.Const(c))
+        return Right(ReductionResultUnoptimized.Const(c))
       case p: Pair =>
-        return Right(ReductionResult.List(p))
+        return Right(ReductionResultUnoptimized.List(p))
       case Application(op, _) =>
         s.push(op)
       case S =>
@@ -94,7 +100,7 @@ def reduce(tree: ReductionTree): Either[String, ReductionResult] = {
           case _ => return Left("Encountered wrong argument for I combinator")
         }
         s.push(a1.operand)
-      case op @ (Plus | Minus | Mul | Div) =>
+      case op @ (Plus | Minus | Mul | Div | Leq | Lt | Geq | Gt | Eq | Neq) =>
         if (s.length < 3) {
           return Left("Encountered built-in operator with too few arguments")
         }
@@ -107,31 +113,45 @@ def reduce(tree: ReductionTree): Either[String, ReductionResult] = {
           case a: Application => a
           case _ => return Left("Encountered wrong argument for built-in operator")
         }
-        val n2 = reduce(a2.operand) match {
+        val n2 = reduceUnoptimized(a2.operand) match {
           case Right(res) => res match {
-            case ReductionResult.Const(Constant.Num(n)) =>
+            case ReductionResultUnoptimized.Const(Constant.Num(n)) =>
               n
             case _ => return Left("Encountered wrong argument for built-in operator")
           }
           case Left(e) => return Left(e)
         }
-        val n1 = reduce(a1.operand) match {
+        val n1 = reduceUnoptimized(a1.operand) match {
           case Right(res) => res match {
-            case ReductionResult.Const(Constant.Num(n)) =>
+            case ReductionResultUnoptimized.Const(Constant.Num(n)) =>
               n
             case _ => return Left("Encountered wrong argument for built-in operator")
           }
           case Left(e) => return Left(e)
         }
         a1.operator = I
-        a1.operand = Const(Constant.Num(
-          op match {
-            case Plus => n2+n1
-            case Minus => n2-n1
-            case Mul => n2*n1
-            case Div => n2/n1
-          }
-        ))
+        a1.operand = op match {
+          case op @ (Plus | Minus | Mul | Div) =>
+            Const(Constant.Num(
+              op match {
+                case Plus => n2 + n1
+                case Minus => n2 - n1
+                case Mul => n2 * n1
+                case Div => n2 / n1
+              }
+            ))
+          case op @ (Leq | Lt | Geq | Gt | Eq | Neq) =>
+            Const(Constant.Bool(
+              op match {
+                case Leq => n2 <= n1
+                case Lt => n2 < n1
+                case Geq => n2 >= n1
+                case Gt => n2 > n1
+                case Eq => n2 == n1
+                case Neq => n2 != n1
+              }
+            ))
+        }
         s.push(a1.operand)
       case Cond =>
         if (s.length < 4) {
@@ -150,9 +170,9 @@ def reduce(tree: ReductionTree): Either[String, ReductionResult] = {
           case a: Application => a
           case _ => return Left("Encountered wrong argument for built-in operator")
         }
-        val b = reduce(a3.operand) match {
+        val b = reduceUnoptimized(a3.operand) match {
           case Right(res) => res match {
-            case ReductionResult.Const(Constant.Bool(b)) => b
+            case ReductionResultUnoptimized.Const(Constant.Bool(b)) => b
             case _ => return Left("")
           }
           case Left(e) => return Left(e)
@@ -184,9 +204,9 @@ def reduce(tree: ReductionTree): Either[String, ReductionResult] = {
           case a: Application => a
           case _ => return Left("Encountered wrong argument for built-in operator")
         }
-        val p = reduce(a1.operand) match {
+        val p = reduceUnoptimized(a1.operand) match {
           case Right(res) => res match {
-            case ReductionResult.List(p) => p
+            case ReductionResultUnoptimized.List(p) => p
             case _ => return Left("")
           }
           case Left(e) => return Left(e)
@@ -197,7 +217,7 @@ def reduce(tree: ReductionTree): Either[String, ReductionResult] = {
           case Tl => p.tl
         }
         s.push(a1.operand)
-      /*case Y =>
+      case Y =>
         if (s.length < 2) {
           return Left("Encountered Y combinator with too few arguments")
         }
@@ -229,7 +249,7 @@ def reduce(tree: ReductionTree): Either[String, ReductionResult] = {
         a1.operand = Application(Tl, z)
         s.push(a1)
         s.push(a1.operator)
-        s.push(f)*/
+        s.push(f)
       case Unresolved(n) =>
         return Left("Encountered unresolved variable: \"" + n + "\"")
     }
@@ -242,26 +262,26 @@ def reduce(tree: ReductionTree): Either[String, ReductionResult] = {
  * Does not print a newline after its output.
  * @param tree a compilation tree as received from the compiler
  */
-def evalAndPrint(tree: ReductionTree): Unit = {
-    reduce(tree) match {
-      case Left(e) => print("Reduction Error: " + e)
-      case Right(res) =>
-        res match {
-          case ReductionResult.Const(c) =>
-            c match {
-              case Constant.Bool(b) =>
-                print(b.toString + " (bool)")
-              case Constant.Num(n) =>
-                print(n.toString + " (num)")
-              case Constant.Str(s) =>
-                print("\"" + s + "\" (string)")
-              case Constant.Nil =>
-                print("nil")
-            }
-          case ReductionResult.List(p) =>
-            evalAndPrint(p.hd)
-            print(" : ")
-            evalAndPrint(p.tl)
-        }
-    }
+def evalAndPrintUnoptimized(tree: ReductionTreeUnoptimized): Unit = {
+  reduceUnoptimized(tree) match {
+    case Left(e) => print("Reduction Error: " + e)
+    case Right(res) =>
+      res match {
+        case ReductionResultUnoptimized.Const(c) =>
+          c match {
+            case Constant.Bool(b) =>
+              print(b.toString + " (bool)")
+            case Constant.Num(n) =>
+              print(n.toString + " (num)")
+            case Constant.Str(s) =>
+              print("\"" + s + "\" (string)")
+            case Constant.Nil =>
+              print("nil")
+          }
+        case ReductionResultUnoptimized.List(p) =>
+          evalAndPrintUnoptimized(p.hd)
+          print(" : ")
+          evalAndPrintUnoptimized(p.tl)
+      }
+  }
 }

@@ -17,8 +17,12 @@ class VisualizerParseTree {
   def visit(pt: ParseTree): String = {
     val id = nextId()
     pt match {
-      case Ident(name) =>
-        sb.append(s"""  $id [label="$name"];\n""")
+      case Ident(name, scope) =>
+        val l = scope match {
+          case Some(scope) => scope.toString + name
+          case None => name
+        }
+        sb.append(s"""  $id [label="$l"];\n""")
       case Const(Constant.Num(n)) =>
         sb.append(s"""  $id [label="$n"];\n""")
       case Const(Constant.Bool(b)) =>

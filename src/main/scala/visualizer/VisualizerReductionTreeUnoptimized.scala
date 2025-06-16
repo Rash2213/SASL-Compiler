@@ -1,12 +1,12 @@
 package visualizer
 
-import vm.ReductionTree
-import vm.ReductionTree.*
+import vm.ReductionTreeUnoptimized
+import vm.ReductionTreeUnoptimized.*
 import parser.Constant
 
 import scala.collection.mutable
 
-class VisualizerReductionTree {
+class VisualizerReductionTreeUnoptimized {
   private var idCounter = 0
   private val sb = new StringBuilder
 
@@ -15,14 +15,16 @@ class VisualizerReductionTree {
     "node" + idCounter
   }
 
-  def visit(pt: ReductionTree, visited: mutable.Map[Int, String]): String = {
+  def visit(pt: ReductionTreeUnoptimized, visited: mutable.Map[Int, String]): String = {
     val id = nextId()
     pt match {
-      case op @ (S | K | I | Plus | Minus | Mul | Div | Cond | Cons | Hd | Tl) =>
+      case op @ (S | K | I | Y | U | Plus | Minus | Mul | Div | Cond | Cons | Hd | Tl) =>
         val name = op match {
           case S => "S"
           case K => "K"
           case I => "I"
+          case Y => "Y"
+          case U => "U"
           case Plus => "Plus"
           case Minus => "Minus"
           case Mul => "Mul"
@@ -70,7 +72,7 @@ class VisualizerReductionTree {
     id
   }
 
-  def generateDot(tree: ReductionTree): String = {
+  def generateDot(tree: ReductionTreeUnoptimized): String = {
     sb.clear()
     val pid = nextId()
     sb.append("digraph ReductionTree {\n")

@@ -11,31 +11,31 @@ import scala.collection.mutable
 class VisualizerParseTreeSpec extends munit.FunSuite {
   test("visualization of static parse trees") {
     val pte: ParseTree = Application(
-      Ident("null"),
-      Ident("l")
+      Ident("null", None),
+      Ident("l", None)
     )
     val vme: VariableMap = mutable.Map()
     vme("l") = (Application(
       Application(
-        Ident("cons"),
+        Ident("cons", None),
         Const(Constant.Num(1))
       ),
       Const(Constant.Nil)
     ), Array())
     vme("null") = (Application(
       Application(
-        Ident("eq"),
-        Ident("xs"),
+        Ident("eq", None),
+        Ident("xs", None),
       ),
       Const(Constant.Nil)
     ), Array("xs"))
 
     val ptt: ParseTree = Application(
       Application(
-        Ident("myplus"),
-        Ident("x")
+        Ident("myplus", None),
+        Ident("x", None)
       ),
-      Ident("y")
+      Ident("y", None)
     )
 
     val vmt: VariableMap = mutable.Map()
@@ -43,10 +43,10 @@ class VisualizerParseTreeSpec extends munit.FunSuite {
     vmt("y") = (Const(Constant.Num(42)), Array())
     vmt("myplus") = (Application(
       Application(
-        Ident("plus"),
-        Ident("x"),
+        Ident("plus", None),
+        Ident("x", None),
       ),
-      Ident("y"),
+      Ident("y", None),
     ), Array("x", "y"))
 
     val visualizer = VisualizerParseTree()

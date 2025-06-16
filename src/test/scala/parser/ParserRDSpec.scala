@@ -29,7 +29,7 @@ class ParserRDSpec extends munit.FunSuite {
     val lNil = TestLexer(Array(CNil))
 
     parseSuccess(parserRDSimple(lId, firstSet, varMap, scopes, 0)) { pt =>
-      assertEquals(pt, Ident("0myVar"))
+      assertEquals(pt, Ident("myVar", Some(0)))
     }
     parseSuccess(parserRDSimple(lNum, firstSet, varMap, scopes, 0)) { pt =>
       assertEquals(pt, Const(Constant.Num(12)))
@@ -48,12 +48,12 @@ class ParserRDSpec extends munit.FunSuite {
 
     val l = TestLexer(Array(CNum(12), CBool(true), CNil))
 
-    parseSuccess(parserRDCombP(l, firstSet, varMap, scopes, 0, Ident("myVar"))) { pt =>
+    parseSuccess(parserRDCombP(l, firstSet, varMap, scopes, 0, Ident("myVar", None))) { pt =>
       assertEquals(pt,
         Application(
           Application(
             Application(
-              Ident("myVar"),
+              Ident("myVar", None),
               Const(Constant.Num(12))
             ),
             Const(Constant.Bool(true))
@@ -78,7 +78,7 @@ class ParserRDSpec extends munit.FunSuite {
         Application(
           Application(
             Application(
-              Ident("0myVar"),
+              Ident("myVar", Some(0)),
               Const(Constant.Num(12))
             ),
             Const(Constant.Bool(true))
@@ -92,7 +92,7 @@ class ParserRDSpec extends munit.FunSuite {
         Application(
           Application(
             Application(
-              Ident("0myVar"),
+              Ident("myVar", Some(0)),
               Const(Constant.Num(12))
             ),
             Const(Constant.Bool(true))
@@ -104,11 +104,11 @@ class ParserRDSpec extends munit.FunSuite {
     parseSuccess(parserRDFactor(lMinus, firstSet, varMap, scopes, 0)) { pt =>
       assertEquals(pt,
         Application(
-          Ident("inv"),
+          Ident("inv", None),
           Application(
             Application(
               Application(
-                Ident("0myVar"),
+                Ident("myVar", Some(0)),
                 Const(Constant.Num(12))
               ),
               Const(Constant.Bool(true))
@@ -121,11 +121,11 @@ class ParserRDSpec extends munit.FunSuite {
     parseSuccess(parserRDFactor(lNot, firstSet, varMap, scopes, 0)) { pt =>
       assertEquals(pt,
         Application(
-          Ident("not"),
+          Ident("not", None),
           Application(
             Application(
               Application(
-                Ident("0myVar"),
+                Ident("myVar", Some(0)),
                 Const(Constant.Num(12))
               ),
               Const(Constant.Bool(true))
@@ -145,15 +145,15 @@ class ParserRDSpec extends munit.FunSuite {
     val lDiv = TestLexer(Array(SDiv, CNum(3), SMul, CNum(2)))
     val lNone = TestLexer[Token](Array())
 
-    parseSuccess(parserRDMulP(lMul, firstSet, varMap, Ident("x"), scopes, 0)) { pt =>
+    parseSuccess(parserRDMulP(lMul, firstSet, varMap, Ident("x", None), scopes, 0)) { pt =>
       assertEquals(pt,
         Application(
           Application(
-            Ident("div"),
+            Ident("div", None),
             Application(
               Application(
-                Ident("mul"),
-                Ident("x")
+                Ident("mul", None),
+                Ident("x", None)
               ),
               Const(Constant.Num(2))
             )
@@ -163,15 +163,15 @@ class ParserRDSpec extends munit.FunSuite {
       )
     }
 
-    parseSuccess(parserRDMulP(lDiv, firstSet, varMap, Ident("x"), scopes, 0)) { pt =>
+    parseSuccess(parserRDMulP(lDiv, firstSet, varMap, Ident("x", None), scopes, 0)) { pt =>
       assertEquals(pt,
         Application(
           Application(
-            Ident("mul"),
+            Ident("mul", None),
             Application(
               Application(
-                Ident("div"),
-                Ident("x")
+                Ident("div", None),
+                Ident("x", None)
               ),
               Const(Constant.Num(3))
             )
@@ -181,8 +181,8 @@ class ParserRDSpec extends munit.FunSuite {
       )
     }
 
-    parseSuccess(parserRDMulP(lNone, firstSet, varMap, Ident("x"), scopes, 0)) { pt =>
-      assertEquals(pt, Ident("x"))
+    parseSuccess(parserRDMulP(lNone, firstSet, varMap, Ident("x", None), scopes, 0)) { pt =>
+      assertEquals(pt, Ident("x", None))
     }
   }
 
@@ -194,15 +194,15 @@ class ParserRDSpec extends munit.FunSuite {
     val lMinusPlus = TestLexer(Array(SMinus, CNum(3), SPlus, CNum(2)))
     val lNone = TestLexer[Token](Array())
 
-    parseSuccess(parserRDAddP(lPlusMinus, firstSet, varMap, Ident("x"), scopes, 0)) { pt =>
+    parseSuccess(parserRDAddP(lPlusMinus, firstSet, varMap, Ident("x", None), scopes, 0)) { pt =>
       assertEquals(pt,
         Application(
           Application(
-            Ident("minus"),
+            Ident("minus", None),
             Application(
               Application(
-                Ident("plus"),
-                Ident("x")
+                Ident("plus", None),
+                Ident("x", None)
               ),
               Const(Constant.Num(2))
             )
@@ -212,15 +212,15 @@ class ParserRDSpec extends munit.FunSuite {
       )
     }
 
-    parseSuccess(parserRDAddP(lMinusPlus, firstSet, varMap, Ident("x"), scopes, 0)) { pt =>
+    parseSuccess(parserRDAddP(lMinusPlus, firstSet, varMap, Ident("x", None), scopes, 0)) { pt =>
       assertEquals(pt,
         Application(
           Application(
-            Ident("plus"),
+            Ident("plus", None),
             Application(
               Application(
-                Ident("minus"),
-                Ident("x")
+                Ident("minus", None),
+                Ident("x", None)
               ),
               Const(Constant.Num(3))
             )
@@ -230,8 +230,8 @@ class ParserRDSpec extends munit.FunSuite {
       )
     }
 
-    parseSuccess(parserRDAddP(lNone, firstSet, varMap, Ident("x"), scopes, 0)) { pt =>
-      assertEquals(pt, Ident("x"))
+    parseSuccess(parserRDAddP(lNone, firstSet, varMap, Ident("x", None), scopes, 0)) { pt =>
+      assertEquals(pt, Ident("x", None))
     }
   }
 
@@ -247,15 +247,15 @@ class ParserRDSpec extends munit.FunSuite {
     val lGeqLeq = TestLexer(Array(SGreaterEqual, CNum(3), SLessEqual, CNum(2)))
     val lNone = TestLexer[Token](Array())
 
-    parseSuccess(parserRDComparP(lEq, firstSet, varMap, Ident("x"), scopes, 0)) { pt =>
+    parseSuccess(parserRDComparP(lEq, firstSet, varMap, Ident("x", None), scopes, 0)) { pt =>
       assertEquals(pt,
         Application(
           Application(
-            Ident("neq"),
+            Ident("neq", None),
             Application(
               Application(
-                Ident("eq"),
-                Ident("x")
+                Ident("eq", None),
+                Ident("x", None)
               ),
               Const(Constant.Num(2))
             )
@@ -265,15 +265,15 @@ class ParserRDSpec extends munit.FunSuite {
       )
     }
 
-    parseSuccess(parserRDComparP(lNeq, firstSet, varMap, Ident("x"), scopes, 0)) { pt =>
+    parseSuccess(parserRDComparP(lNeq, firstSet, varMap, Ident("x", None), scopes, 0)) { pt =>
       assertEquals(pt,
         Application(
           Application(
-            Ident("eq"),
+            Ident("eq", None),
             Application(
               Application(
-                Ident("neq"),
-                Ident("x")
+                Ident("neq", None),
+                Ident("x", None)
               ),
               Const(Constant.Num(3))
             )
@@ -283,15 +283,15 @@ class ParserRDSpec extends munit.FunSuite {
       )
     }
 
-    parseSuccess(parserRDComparP(lLtGt, firstSet, varMap, Ident("x"), scopes, 0)) { pt =>
+    parseSuccess(parserRDComparP(lLtGt, firstSet, varMap, Ident("x", None), scopes, 0)) { pt =>
       assertEquals(pt,
         Application(
           Application(
-            Ident("gt"),
+            Ident("gt", None),
             Application(
               Application(
-                Ident("lt"),
-                Ident("x")
+                Ident("lt", None),
+                Ident("x", None)
               ),
               Const(Constant.Num(1))
             )
@@ -301,15 +301,15 @@ class ParserRDSpec extends munit.FunSuite {
       )
     }
 
-    parseSuccess(parserRDComparP(lGtLt, firstSet, varMap, Ident("x"), scopes, 0)) { pt =>
+    parseSuccess(parserRDComparP(lGtLt, firstSet, varMap, Ident("x", None), scopes, 0)) { pt =>
       assertEquals(pt,
         Application(
           Application(
-            Ident("lt"),
+            Ident("lt", None),
             Application(
               Application(
-                Ident("gt"),
-                Ident("x")
+                Ident("gt", None),
+                Ident("x", None)
               ),
               Const(Constant.Num(4))
             )
@@ -319,15 +319,15 @@ class ParserRDSpec extends munit.FunSuite {
       )
     }
 
-    parseSuccess(parserRDComparP(lLeqGeq, firstSet, varMap, Ident("x"), scopes, 0)) { pt =>
+    parseSuccess(parserRDComparP(lLeqGeq, firstSet, varMap, Ident("x", None), scopes, 0)) { pt =>
       assertEquals(pt,
         Application(
           Application(
-            Ident("geq"),
+            Ident("geq", None),
             Application(
               Application(
-                Ident("leq"),
-                Ident("x")
+                Ident("leq", None),
+                Ident("x", None)
               ),
               Const(Constant.Num(2))
             )
@@ -337,15 +337,15 @@ class ParserRDSpec extends munit.FunSuite {
       )
     }
 
-    parseSuccess(parserRDComparP(lGeqLeq, firstSet, varMap, Ident("x"), scopes, 0)) { pt =>
+    parseSuccess(parserRDComparP(lGeqLeq, firstSet, varMap, Ident("x", None), scopes, 0)) { pt =>
       assertEquals(pt,
         Application(
           Application(
-            Ident("leq"),
+            Ident("leq", None),
             Application(
               Application(
-                Ident("geq"),
-                Ident("x")
+                Ident("geq", None),
+                Ident("x", None)
               ),
               Const(Constant.Num(3))
             )
@@ -355,8 +355,8 @@ class ParserRDSpec extends munit.FunSuite {
       )
     }
 
-    parseSuccess(parserRDComparP(lNone, firstSet, varMap, Ident("x"), scopes, 0)) { pt =>
-      assertEquals(pt, Ident("x"))
+    parseSuccess(parserRDComparP(lNone, firstSet, varMap, Ident("x", None), scopes, 0)) { pt =>
+      assertEquals(pt, Ident("x", None))
     }
   }
 
@@ -367,15 +367,15 @@ class ParserRDSpec extends munit.FunSuite {
     val lAnd = TestLexer(Array(SAnd, CBool(true), SAnd, CBool(false)))
     val lNone = TestLexer[Token](Array())
 
-    parseSuccess(parserRDConjunctP(lAnd, firstSet, varMap, Ident("x"), scopes, 0)) { pt =>
+    parseSuccess(parserRDConjunctP(lAnd, firstSet, varMap, Ident("x", None), scopes, 0)) { pt =>
       assertEquals(pt,
         Application(
           Application(
-            Ident("and"),
+            Ident("and", None),
             Application(
               Application(
-                Ident("and"),
-                Ident("x")
+                Ident("and", None),
+                Ident("x", None)
               ),
               Const(Constant.Bool(true))
             )
@@ -385,8 +385,8 @@ class ParserRDSpec extends munit.FunSuite {
       )
     }
 
-    parseSuccess(parserRDConjunctP(lNone, firstSet, varMap, Ident("x"), scopes, 0)) { pt =>
-      assertEquals(pt, Ident("x"))
+    parseSuccess(parserRDConjunctP(lNone, firstSet, varMap, Ident("x", None), scopes, 0)) { pt =>
+      assertEquals(pt, Ident("x", None))
     }
   }
 
@@ -397,15 +397,15 @@ class ParserRDSpec extends munit.FunSuite {
     val lOr = TestLexer(Array(SOr, CBool(true), SOr, CBool(false)))
     val lNone = TestLexer[Token](Array())
 
-    parseSuccess(parserRDOpExprP(lOr, firstSet, varMap, Ident("x"), scopes, 0)) { pt =>
+    parseSuccess(parserRDOpExprP(lOr, firstSet, varMap, Ident("x", None), scopes, 0)) { pt =>
       assertEquals(pt,
         Application(
           Application(
-            Ident("or"),
+            Ident("or", None),
             Application(
               Application(
-                Ident("or"),
-                Ident("x")
+                Ident("or", None),
+                Ident("x", None)
               ),
               Const(Constant.Bool(true))
             )
@@ -415,8 +415,8 @@ class ParserRDSpec extends munit.FunSuite {
       )
     }
 
-    parseSuccess(parserRDOpExprP(lNone, firstSet, varMap, Ident("x"), scopes, 0)) { pt =>
-      assertEquals(pt, Ident("x"))
+    parseSuccess(parserRDOpExprP(lNone, firstSet, varMap, Ident("x", None), scopes, 0)) { pt =>
+      assertEquals(pt, Ident("x", None))
     }
   }
 
@@ -436,12 +436,12 @@ class ParserRDSpec extends munit.FunSuite {
       assertEquals(pt,
         Application(
           Application(
-            Ident("cons"),
+            Ident("cons", None),
             Const(Constant.Num(1))
           ),
           Application(
             Application(
-              Ident("cons"),
+              Ident("cons", None),
               Const(Constant.Bool(true))
             ),
             Const(Constant.Nil)
@@ -462,12 +462,12 @@ class ParserRDSpec extends munit.FunSuite {
       assertEquals(pt,
         Application(
           Application(
-            Ident("cons"),
+            Ident("cons", None),
             Const(Constant.Num(1))
           ),
           Application(
             Application(
-              Ident("cons"),
+              Ident("cons", None),
               Const(Constant.Bool(true))
             ),
             Const(Constant.Nil)
@@ -481,7 +481,7 @@ class ParserRDSpec extends munit.FunSuite {
         Application(
           Application(
             Application(
-              Ident("cond"),
+              Ident("cond", None),
               Const(Constant.Bool(true))
             ),
             Const(Constant.Bool(false))
@@ -503,15 +503,15 @@ class ParserRDSpec extends munit.FunSuite {
       assertEquals(pt,
         Application(
           Application(
-            Ident("plus"),
-            Ident("0x")
+            Ident("plus", None),
+            Ident("x", Some(0))
           ),
           Application(
             Application(
-              Ident("div"),
-              Ident("0y")
+              Ident("div", None),
+              Ident("y", Some(0))
             ),
-            Ident("0z")
+            Ident("z", Some(0))
           )
         )
       )
@@ -552,7 +552,7 @@ class ParserRDSpec extends munit.FunSuite {
       assertEquals(pt,
         Application(
           Application(
-            Ident("cons"),
+            Ident("cons", None),
             Const(Constant.Num(1))
           ),
           Const(Constant.Nil)
@@ -565,17 +565,17 @@ class ParserRDSpec extends munit.FunSuite {
       assertEquals(pt,
         Application(
           Application(
-            Ident("cons"),
+            Ident("cons", None),
             Const(Constant.Num(1))
           ),
           Application(
             Application(
-              Ident("cons"),
+              Ident("cons", None),
               Const(Constant.Bool(true))
             ),
             Application(
               Application(
-                Ident("cons"),
+                Ident("cons", None),
                 Const(Constant.Str("test"))
               ),
               Const(Constant.Nil)
@@ -595,8 +595,8 @@ class ParserRDSpec extends munit.FunSuite {
       assertEquals(varMap.values.size, 3)
       assertEquals(pt,
         Application(
-          Ident("0id2"),
-          Ident("0x")
+          Ident("id2", Some(0)),
+          Ident("x", Some(0))
         )
       )
     }
