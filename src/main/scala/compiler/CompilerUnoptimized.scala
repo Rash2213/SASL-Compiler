@@ -1,7 +1,8 @@
 package compiler
 
 import compiler.CompilerError.UnresolvedVariable
-import vm.ReductionTreeUnoptimized
+import vm.{ReductionTreeUnoptimized, Ownership}
+import vm.Ownership.*
 import parser.{Constant, ParseTreeUnoptimized, Scopes, VariableMapUnoptimized}
 import parser.ParseTreeUnoptimized.*
 
@@ -18,6 +19,8 @@ class CompilerUnoptimized {
     "minus" -> ReductionTreeUnoptimized.Minus,
     "mul" -> ReductionTreeUnoptimized.Mul,
     "div" -> ReductionTreeUnoptimized.Div,
+    "and" -> ReductionTreeUnoptimized.And,
+    "or" -> ReductionTreeUnoptimized.Or,
     /*"not" -> CombTree.Ident("not"),
     "inv" -> CombTree.Ident("inv"),*/
     "cond" -> ReductionTreeUnoptimized.Cond,
@@ -39,19 +42,22 @@ class CompilerUnoptimized {
     Some(scopedName).filter(varNames.contains)
   }
 
-  def resolveVarScopedArg(name: String, scope: Int, scopes: Scopes, envMap: Map[String, ReductionTreeUnoptimized], args: Set[String]): Option[ReductionTreeUnoptimized] = {
+  def resolveVarScopedArg(name: String, scope: Int, scopes: Scopes, envMap: Map[String, ReductionTreeUnoptimized], args: Set[String]): Option[Ownership[ReductionTreeUnoptimized]] = {
     var s = scope
     while (s != 0) {
       envMap.get(s.toString + name) match {
-        case Some(v) => return Some(v)
+        case Some(v) => return Some(Weak(v))
         case None =>
       }
       if (args.contains(s.toString + name)) {
-        return Some(ReductionTreeUnoptimized.Unresolved(s.toString + name))
+        return Some(Strong(ReductionTreeUnoptimized.Unresolved(s.toString + name)))
       }
       s = scopes(s).parent
     }
-    envMap.get("0" + name)
+    envMap.get("0" + name) match {
+      case Some(v) => Some(Weak(v))
+      case None => None
+    }
   }
 
   def resolveVarScoped(name: String, scope: Int, scopes: Scopes, envMap: Map[String, ReductionTreeUnoptimized]): Option[ReductionTreeUnoptimized] = {
@@ -66,11 +72,11 @@ class CompilerUnoptimized {
     envMap.get("0" + name)
   }
 
-  def compileLoose(tree: ParseTreeUnoptimized, scopes: Scopes, envMap: Map[String, ReductionTreeUnoptimized], argNames: Set[String]): Either[CompilerError, ReductionTreeUnoptimized] = {
+  def compileLoose(tree: ParseTreeUnoptimized, scopes: Scopes, envMap: Map[String, ReductionTreeUnoptimized], argNames: Set[String]): Either[CompilerError, Ownership[ReductionTreeUnoptimized]] = {
     tree match {
-      case Const(c) => Right(ReductionTreeUnoptimized.Const(c))
+      case Const(c) => Right(Strong(ReductionTreeUnoptimized.Const(c)))
       case Application(f, x) =>
-        Right(ReductionTreeUnoptimized.Application(
+        Right(Strong(ReductionTreeUnoptimized.Application(
           compileLoose(f, scopes, envMap, argNames) match {
             case Left(e) => return Left(e)
             case Right(v) => v
@@ -79,14 +85,14 @@ class CompilerUnoptimized {
             case Left(e) => return Left(e)
             case Right(v) => v
           }
-        ))
+        )))
       case Ident(name, scope) =>
         scope match {
           case Some(scope) =>
             resolveVarScopedArg(name, scope, scopes, envMap, argNames) match {
               case None => builtins.get(name) match {
                 case None => Left(UnresolvedVariable(name))
-                case Some(v) => Right(v)
+                case Some(v) => Right(Strong(v))
               }
               case Some(rt) =>
                 Right(rt)
@@ -94,43 +100,45 @@ class CompilerUnoptimized {
           case None =>
             builtins.get(name) match {
               case None => Left(UnresolvedVariable(name))
-              case Some(v) => Right(v)
+              case Some(v) => Right(Strong(v))
             }
         }
       case Where(pt, fs) =>
         // U @ ([𝑓] (U @ [𝑔] (K @ 𝐸1))) @ (Y @ (U @ ([𝑓] (U @ [𝑔] (K @ [[𝑥] 𝐸2,[𝑦] 𝐸3])))))
+        val fNames = fs.map(x => x._1)
+
         val bodyList = fs.foldRight(ReductionTreeUnoptimized.Const(Constant.Nil)) {
           case ((name, (pt, args)), current) =>
-            val names = argNames ++ args
+            val names = argNames ++ args ++ fNames
             val compiledBody = compileLoose(pt, scopes, envMap, names) match {
               case Right(rt) => rt
               case Left(e) => return Left(e)
             }
-            val abstracted = args.foldRight(compiledBody) { (arg, acc) => abstractVar(arg, acc) }
+            val abstracted = args.foldRight(compiledBody) { (arg, acc) => abstractVarOwnership(arg, acc) }
             ReductionTreeUnoptimized.Application(
-              ReductionTreeUnoptimized.Application(
-                ReductionTreeUnoptimized.Cons,
+              Strong(ReductionTreeUnoptimized.Application(
+                Strong(ReductionTreeUnoptimized.Cons),
                 abstracted
-              ),
-              current
+              )),
+              Strong(current)
             )
         }
         val bodyExpr = fs.map(f => f._1).foldRight(
           ReductionTreeUnoptimized.Application(
-            ReductionTreeUnoptimized.K,
-            bodyList
+            Strong(ReductionTreeUnoptimized.K),
+            Strong(bodyList)
           )
         ) {
           case (name, current) =>
             ReductionTreeUnoptimized.Application(
-              ReductionTreeUnoptimized.U,
-              abstractVar(name, current)
+              Strong(ReductionTreeUnoptimized.U),
+              Strong(abstractVar(name, current))
             )
         }
         val mainExpr = fs.map(f => f._1).foldRight(
           ReductionTreeUnoptimized.Application(
-            ReductionTreeUnoptimized.K,
-            compileLoose(pt, scopes, envMap, argNames) match {
+            Strong(ReductionTreeUnoptimized.K),
+            compileLoose(pt, scopes, envMap, argNames ++ fNames) match {
               case Right(rt) => rt
               case Left(e) => return Left(e)
             }
@@ -138,18 +146,18 @@ class CompilerUnoptimized {
         ) {
           case (name, current) =>
             ReductionTreeUnoptimized.Application(
-              ReductionTreeUnoptimized.U,
-              abstractVar(name, current)
+              Strong(ReductionTreeUnoptimized.U),
+              Strong(abstractVar(name, current))
             )
         }
 
-        Right(ReductionTreeUnoptimized.Application(
-          mainExpr,
-          ReductionTreeUnoptimized.Application(
-            ReductionTreeUnoptimized.Y,
-            bodyExpr
-          )
-        ))
+        Right(Strong(ReductionTreeUnoptimized.Application(
+          Strong(mainExpr),
+          Strong(ReductionTreeUnoptimized.Application(
+            Strong(ReductionTreeUnoptimized.Y),
+            Strong(bodyExpr)
+          ))
+        )))
     }
   }
 
@@ -175,49 +183,51 @@ class CompilerUnoptimized {
       case Application(f, x) =>
         Right(ReductionTreeUnoptimized.Application(
           compileStrict(f, scopes, env) match {
-            case Right(rt) => rt
+            case Right(rt) => Strong(rt)
             case Left(e) => return Left(e)
           },
           compileStrict(x, scopes, env) match {
-            case Right(rt) => rt
+            case Right(rt) => Strong(rt)
             case Left(e) => return Left(e)
           }
         ))
       case Where(pt, fs) =>
         // U @ ([𝑓] (U @ [𝑔] (K @ 𝐸1))) @ (Y @ (U @ ([𝑓] (U @ [𝑔] (K @ [[𝑥] 𝐸2,[𝑦] 𝐸3])))))
+        val lFNames = fs.map(x => x._1)
+
         val functionNames = env.keys.toSet
         val bodyList = fs.foldRight(ReductionTreeUnoptimized.Const(Constant.Nil)) {
           case ((name, (pt, args)), current) =>
-            val names = functionNames ++ args
+            val names = functionNames ++ args ++ lFNames
             val compiledBody = compileLoose(pt, scopes, env, names) match {
               case Right(rt) => rt
               case Left(e) => return Left(e)
             }
-            val abstracted = args.foldRight(compiledBody) { (arg, acc) => abstractVar(arg, acc) }
+            val abstracted = args.foldRight(compiledBody) { (arg, acc) => abstractVarOwnership(arg, acc) }
             ReductionTreeUnoptimized.Application(
-              ReductionTreeUnoptimized.Application(
-                ReductionTreeUnoptimized.Cons,
+              Strong(ReductionTreeUnoptimized.Application(
+                Strong(ReductionTreeUnoptimized.Cons),
                 abstracted
-              ),
-              current
+              )),
+              Strong(current)
             )
         }
         val bodyExpr = fs.map(f => f._1).foldRight(
-          ReductionTreeUnoptimized.Application(
-            ReductionTreeUnoptimized.K,
-            bodyList
-          )
+          Strong(ReductionTreeUnoptimized.Application(
+            Strong(ReductionTreeUnoptimized.K),
+            Strong(bodyList)
+          ))
         ) {
           case (name, current) =>
-            ReductionTreeUnoptimized.Application(
-              ReductionTreeUnoptimized.U,
-              abstractVar(name, current)
-            )
+            Strong(ReductionTreeUnoptimized.Application(
+              Strong(ReductionTreeUnoptimized.U),
+              Strong(abstractVar(name, current.inner))
+            ))
         }
         val mainExpr = fs.map(f => f._1).foldRight(
           ReductionTreeUnoptimized.Application(
-            ReductionTreeUnoptimized.K,
-            compileLoose(pt, scopes, env, functionNames) match {
+            Strong(ReductionTreeUnoptimized.K),
+            compileLoose(pt, scopes, env, functionNames ++ lFNames) match {
               case Right(rt) => rt
               case Left(e) => return Left(e)
             }
@@ -225,25 +235,26 @@ class CompilerUnoptimized {
         ) {
           case (name, current) =>
             ReductionTreeUnoptimized.Application(
-              ReductionTreeUnoptimized.U,
-              abstractVar(name, current)
+              Strong(ReductionTreeUnoptimized.U),
+              Strong(abstractVar(name, current))
             )
         }
 
         Right(ReductionTreeUnoptimized.Application(
-          mainExpr,
-          ReductionTreeUnoptimized.Application(
-            ReductionTreeUnoptimized.Y,
+          Strong(mainExpr),
+          Strong(ReductionTreeUnoptimized.Application(
+            Strong(ReductionTreeUnoptimized.Y),
             bodyExpr
-          )
+          ))
         ))
     }
   }
 
+  // ToDo: careful, currently can only be used on tree, later perhaps just don't follow weak ownership
   private def usesVar(name: String, tree: ReductionTreeUnoptimized): Boolean = tree match {
     case ReductionTreeUnoptimized.Unresolved(n) => n == name
     case ReductionTreeUnoptimized.Application(f, x) =>
-      usesVar(name, f) || usesVar(name, x)
+      usesVar(name, f.inner) || usesVar(name, x.inner)
     case _ => false
   }
 
@@ -263,6 +274,8 @@ class CompilerUnoptimized {
          | ReductionTreeUnoptimized.Gt
          | ReductionTreeUnoptimized.Neq
          | ReductionTreeUnoptimized.Eq
+         | ReductionTreeUnoptimized.And
+         | ReductionTreeUnoptimized.Or
          | ReductionTreeUnoptimized.Const(_)
          | ReductionTreeUnoptimized.Cond
          | ReductionTreeUnoptimized.Cons
@@ -270,30 +283,73 @@ class CompilerUnoptimized {
          | ReductionTreeUnoptimized.Tl
     =>
       ReductionTreeUnoptimized.Application(
-        ReductionTreeUnoptimized.K,
-        body
+        Strong(ReductionTreeUnoptimized.K),
+        Strong(body)
       )
     case ReductionTreeUnoptimized.Application(f, x) =>
+      // only continue abstraction wherever the reference is not weak
+      val fa = f match {
+        case Weak(_) => Strong(ReductionTreeUnoptimized.Application(
+          Strong(ReductionTreeUnoptimized.K),
+          f
+        ))
+        case Strong(i) => Strong(abstractVar(name, i))
+      }
+      val xa = x match {
+        case Weak(_) => Strong(ReductionTreeUnoptimized.Application(
+          Strong(ReductionTreeUnoptimized.K),
+          x
+        ))
+        case Strong(i) => Strong(abstractVar(name, i))
+      }
       ReductionTreeUnoptimized.Application(
-        ReductionTreeUnoptimized.Application(
-          ReductionTreeUnoptimized.S,
-          abstractVar(name, f)
-        ),
-        abstractVar(name, x)
+        Strong(ReductionTreeUnoptimized.Application(
+          Strong(ReductionTreeUnoptimized.S),
+          fa
+        )),
+        xa
       )
     case u @ ReductionTreeUnoptimized.Unresolved(n) =>
       if (n == name) {
         ReductionTreeUnoptimized.I
       } else {
         ReductionTreeUnoptimized.Application(
-          ReductionTreeUnoptimized.K,
-          u
+          Strong(ReductionTreeUnoptimized.K),
+          Strong(u)
         )
       }
     case ReductionTreeUnoptimized.Pair(_, _) =>
       // Should never occur, Pair should only exist after reduction
       assert(false)
       body
+  }
+
+  private def abstractVarInPlace(name: String, body: ReductionTreeUnoptimized.Application): Unit = {
+    /*body.operator match {
+      case f @ ReductionTreeUnoptimized.Application => abstractVarInPlace(name, body)
+      case _ => body.operator =
+    }
+    // ToDo: check if we might need to carry weak through somewhere
+    body.operator = Strong(abstractVar(name, body.operator.inner))
+    body.operand = Strong(abstractVar(name, body.operand.inner))*/
+    body.operand match {
+      case Weak(_) =>
+      case Strong(i) => body.operand = Strong(abstractVar(name, i))
+    }
+    body.operator = Strong(ReductionTreeUnoptimized.Application(
+      Strong(ReductionTreeUnoptimized.S),
+      body.operator match {
+        case Weak(_) => body.operator
+        case Strong(i) => Strong(abstractVar(name, i))
+      }
+    ))
+  }
+
+  private def abstractVarOwnership(name: String, body: Ownership[ReductionTreeUnoptimized]): Ownership[ReductionTreeUnoptimized] = {
+    body match {
+      case Weak(_) => body
+      case Strong(i) => Strong(abstractVar(name, i))
+    }
   }
 
   def compileProgram(
@@ -303,7 +359,7 @@ class CompilerUnoptimized {
                     ): Either[CompilerError, ReductionTreeUnoptimized] = {
     val compiledDefs: Map[String, ReductionTreeUnoptimized.Application] = varMap.map {
       case (name, _) =>
-        val rt: ReductionTreeUnoptimized.Application = ReductionTreeUnoptimized.Application(ReductionTreeUnoptimized.I, ReductionTreeUnoptimized.I)
+        val rt: ReductionTreeUnoptimized.Application = ReductionTreeUnoptimized.Application(Strong(ReductionTreeUnoptimized.I), Strong(ReductionTreeUnoptimized.I))
         name -> rt
     }.toMap
     varMap.toList.foldLeft(()) {
@@ -312,14 +368,22 @@ class CompilerUnoptimized {
           case Right(rt) => rt
           case Left(e) => return Left(e)
         }
-        val abstracted = args.foldRight(compiledBody) { (arg, acc) => abstractVar(arg, acc) }
+        compiledBody match {
+          case Strong(ReductionTreeUnoptimized.Application(f, x)) =>
+            compiledDefs(name).operator = f
+            compiledDefs(name).operand = x
+          case x =>
+            compiledDefs(name).operand = x
+        }
+        args.reverseIterator.foreach { arg => abstractVarInPlace(arg, compiledDefs(name)) }
+        /*val abstracted = args.foldRight(compiledBody) { (arg, acc) => abstractVar(arg, acc) }
         abstracted match {
           case ReductionTreeUnoptimized.Application(f, x) =>
             compiledDefs(name).operator = f
             compiledDefs(name).operand = x
           case x =>
             compiledDefs(name).operand = x
-        }
+        }*/
     }
 
     compileStrict(mainTree, scopes, compiledDefs)

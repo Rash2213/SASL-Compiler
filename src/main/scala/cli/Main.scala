@@ -2,7 +2,7 @@ package cli
 
 import lexer.{Lexer, Token}
 import parser.{ParserGenerator, VariableMap, VariableMapUnoptimized, Scopes, parserRDSystem, parserRDUnoptimizedSystem}
-import visualizer.VisualizerParseTree
+import visualizer.{VisualizerParseTreeUnoptimized, VisualizerReductionTreeUnoptimized}
 import parser.SaslData.{NonTerminal, derMap, emMap}
 import compiler.{CompilerUnoptimized, CompilerError}
 import vm.evalAndPrintUnoptimized
@@ -18,12 +18,16 @@ import com.monovore.decline.effect.*
 import scala.collection.mutable
 
 case class VisualizeParseTree(file: String)
+case class VisualizeCompileTree(file: String)
 case class Execute(file: String)
 
 val fileOpts: Opts[String] = Opts.argument[String](metavar = "file")
 
 val optsVisualizeParseTree: Opts[VisualizeParseTree] = Opts.subcommand("vis-pt", "Visualize the parse tree of the program.") {
   fileOpts.map(VisualizeParseTree.apply)
+}
+val optsVisualizeCompileTree: Opts[VisualizeCompileTree] = Opts.subcommand("vis-ct", "Visualize the compile tree of the program.") {
+  fileOpts.map(VisualizeCompileTree.apply)
 }
 val optsExecute: Opts[Execute] = Opts.subcommand("ex", "Execute the given program.") {
   fileOpts.map(Execute.apply)
@@ -49,7 +53,10 @@ object SaslCompilerApp extends CommandIOApp(
 ) {
 
   override def main: Opts[IO[ExitCode]] =
-    (optsVisualizeParseTree.orElse(optsExecute)).map {
+    optsVisualizeParseTree
+      .orElse(optsExecute)
+      .orElse(optsVisualizeCompileTree)
+      .map {
       case VisualizeParseTree(file) =>
         IO {
           val raw = readFileBin(file)
@@ -57,16 +64,48 @@ object SaslCompilerApp extends CommandIOApp(
           val gen: ParserGenerator[Token, NonTerminal] = ParserGenerator()
           val fr = gen.first(NonTerminal.values.length, derMap, emMap)
           val firstSet = fr._1
-          val varMap: VariableMap = mutable.Map()
+          val varMap: VariableMapUnoptimized = mutable.Map()
           val scopes: Scopes = mutable.ArrayBuffer()
-          parserRDSystem(lexer, firstSet, varMap, scopes) match {
+          parserRDUnoptimizedSystem(lexer, firstSet, varMap, scopes) match {
             case Right(pt) =>
-              val visualizer = VisualizerParseTree()
+              val visualizer = VisualizerParseTreeUnoptimized()
               val d = visualizer.generateDot(pt, varMap)
               val fn = getFilename(file)
               visualizer.saveDotToFile(d, s"visualizations/$fn.dot")
               println(s"Visualization saved to visualizations/$fn.dot")
               ExitCode.Success
+            case Left(e) =>
+              println("Encountered error during parsing!")
+              ExitCode.Error
+          }
+        }
+      case VisualizeCompileTree(file) =>
+        IO {
+          val raw = readFileBin(file)
+          val lexer = Lexer(raw)
+          val gen: ParserGenerator[Token, NonTerminal] = ParserGenerator()
+          val fr = gen.first(NonTerminal.values.length, derMap, emMap)
+          val firstSet = fr._1
+          val varMap: VariableMapUnoptimized = mutable.Map()
+          val scopes: Scopes = mutable.ArrayBuffer()
+          parserRDUnoptimizedSystem(lexer, firstSet, varMap, scopes) match {
+            case Right(pt) =>
+              val c = CompilerUnoptimized()
+              c.compileProgram(pt, scopes, varMap) match {
+                case Left(e) =>
+                  e match {
+                    case CompilerError.UnresolvedVariable(n) =>
+                      println("Encountered error during compilation: Unresolved variable \"" + n + "\"!")
+                  }
+                  ExitCode.Error
+                case Right(rt) =>
+                  val visualizer = VisualizerReductionTreeUnoptimized()
+                  val d = visualizer.generateDot(rt)
+                  val fn = getFilename(file)
+                  visualizer.saveDotToFile(d, s"visualizations/rt/$fn.dot")
+                  println(s"Visualization saved to visualizations/rt/$fn.dot")
+                  ExitCode.Success
+              }
             case Left(e) =>
               println("Encountered error during parsing!")
               ExitCode.Error

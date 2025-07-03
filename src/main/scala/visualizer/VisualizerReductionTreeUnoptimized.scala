@@ -2,6 +2,7 @@ package visualizer
 
 import vm.ReductionTreeUnoptimized
 import vm.ReductionTreeUnoptimized.*
+import vm.Ownership.*
 import parser.Constant
 
 import scala.collection.mutable
@@ -18,7 +19,7 @@ class VisualizerReductionTreeUnoptimized {
   def visit(pt: ReductionTreeUnoptimized, visited: mutable.Map[Int, String]): String = {
     val id = nextId()
     pt match {
-      case op @ (S | K | I | Y | U | Plus | Minus | Mul | Div | Cond | Cons | Hd | Tl) =>
+      case op @ (S | K | I | Y | U | Plus | Minus | Mul | Div | Leq | Lt | Geq | Gt | Eq | Neq | And | Or | Cond | Cons | Hd | Tl | Unresolved(_)) =>
         val name = op match {
           case S => "S"
           case K => "K"
@@ -29,10 +30,19 @@ class VisualizerReductionTreeUnoptimized {
           case Minus => "Minus"
           case Mul => "Mul"
           case Div => "Div"
+          case Leq => "Leq"
+          case Lt => "Lt"
+          case Geq => "Geq"
+          case Gt => "Gt"
+          case Eq => "Eq"
+          case Neq => "Neq"
+          case And => "And"
+          case Or => "Or"
           case Cond => "Cond"
           case Cons => "Cons"
           case Hd => "Hd"
           case Tl => "Tl"
+          case Unresolved(name) => "Var: " + name
         }
         sb.append(s"""  $id [label="$name"];\n""")
         return id
@@ -40,9 +50,10 @@ class VisualizerReductionTreeUnoptimized {
     }
     visited.get(System.identityHashCode(pt)) match {
       case Some(rId) =>
-        sb.append(s"""  $id [label=""];\n""")
+        /*sb.append(s"""  $id [label=""];\n""")
         sb.append(s"  $id -> $rId;\n")
-        return id
+        return id*/
+        return rId
       case None =>
     }
     visited.addOne(System.identityHashCode(pt), id)
@@ -57,10 +68,16 @@ class VisualizerReductionTreeUnoptimized {
         sb.append(s"""  $id [label="Nil"];\n""")
       case Application(lhs, rhs) =>
         sb.append(s"""  $id [label="@"];\n""")
-        val lhsId = visit(lhs, visited)
-        val rhsId = visit(rhs, visited)
-        sb.append(s"  $id -> $lhsId;\n")
-        sb.append(s"  $id -> $rhsId;\n")
+        val lhsId = visit(lhs.inner, visited)
+        val rhsId = visit(rhs.inner, visited)
+        lhs match {
+          case Weak(_) => sb.append(s"""  $id -> $lhsId [color="red"];\n""")
+          case Strong(_) => sb.append(s"  $id -> $lhsId;\n")
+        }
+        rhs match {
+          case Weak(_) => sb.append(s"""  $id -> $rhsId [color="red"];\n""")
+          case Strong(_) => sb.append(s"  $id -> $rhsId;\n")
+        }
       case Pair(l, r) =>
         sb.append(s"""  $id [label="pair"];\n""")
         val lId = visit(l, visited)

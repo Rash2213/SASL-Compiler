@@ -42,7 +42,7 @@ def parserRDUnoptimizedSystem(
               case Left(e) => return Left(e)
             }
             //variableMap("0" + s) = pta
-            val aFuns = parserRDUnoptimizedExprP(lexer, first, variableMap, scopes, 0) match {
+            val aFuns = parserRDUnoptimizedExprP(lexer, first, variableMap, scopes, scopeA) match {
               case Right(funs) => funs
               case Left(e) => return Left(e)
             }
@@ -59,11 +59,13 @@ def parserRDUnoptimizedSystem(
               case Some(_) => return Left(ParseError.ToDo)
               case None => return Left(ParseError.ToDo)
             }
-            val ptc = parserRDUnoptimizedCondExpr(lexer, first, variableMap, scopes, 0) match {
+            scopes.addOne(ScopeEntry(0))
+            val scopeM = scopes.length-1
+            val ptc = parserRDUnoptimizedCondExpr(lexer, first, variableMap, scopes, scopeM) match {
               case Right(pt) => pt
               case Left(e) => return Left(e)
             }
-            val lFuns = parserRDUnoptimizedExprP(lexer, first, variableMap, scopes, 0) match {
+            val lFuns = parserRDUnoptimizedExprP(lexer, first, variableMap, scopes, scopeM) match {
               case Right(funs) => funs
               case Left(e) => return Left(e)
             }
@@ -75,11 +77,13 @@ def parserRDUnoptimizedSystem(
           case None => Left(ParseError.ToDo)
         }
       } else if (first(CondExpr.ordinal).map(v => v.ordinal).contains(t.ordinal)) {
-        val ptc = parserRDUnoptimizedCondExpr(lexer, first, variableMap, scopes, 0) match {
+        scopes.addOne(ScopeEntry(0))
+        val scopeM = scopes.length - 1
+        val ptc = parserRDUnoptimizedCondExpr(lexer, first, variableMap, scopes, scopeM) match {
           case Right(pt) => pt
           case Left(e) => return Left(e)
         }
-        val lFuns = parserRDUnoptimizedExprP(lexer, first, variableMap, scopes, 0) match {
+        val lFuns = parserRDUnoptimizedExprP(lexer, first, variableMap, scopes, scopeM) match {
           case Right(funs) => funs
           case Left(e) => return Left(e)
         }
@@ -119,7 +123,7 @@ def parserRDUnoptimizedFuncDefsP(
             case Left(e) => return Left(e)
           }
           //variableMap("0" + s) = pta
-          val lFuns = parserRDUnoptimizedExprP(lexer, first, variableMap, scopes, 0) match {
+          val lFuns = parserRDUnoptimizedExprP(lexer, first, variableMap, scopes, scopeA) match {
             case Right(opt) => opt
             case Left(e) => return Left(e)
           }
@@ -142,8 +146,9 @@ def parserRDUnoptimizedExprP(
                    scopes: Scopes,
                    parentScope: Int,
                  ): Either[ParseError, Option[Array[(String, (ParseTreeUnoptimized, Array[String]))]]] = {
-  scopes.addOne(ScopeEntry(parentScope))
-  val scope = scopes.length-1
+  /*scopes.addOne(ScopeEntry(parentScope))
+  val scope = scopes.length-1*/
+  val scope = parentScope
   lexer.peek() match {
     case Some(t) =>
       if (t.ordinal == KWhere.ordinal) {
@@ -179,7 +184,7 @@ def parserRDUnoptimizedAbstraction(
                          first: ParserRD.gen.FirstMap,
                          variableMap: VariableMapUnoptimized,
                          scopes: Scopes,
-                       // ToDo: unecessary?
+                       // ToDo: unnecessary?
                          parentScope: Int,
                          abstractionScope: Int,
                          al: Array[String] = Array(),
@@ -251,11 +256,13 @@ def parserRDUnoptimizedCondExpr(
     case Some(t) =>
       if (t.ordinal == KIf.ordinal) {
         lexer.next()
-        val ptc = parserRDUnoptimizedCondExpr(lexer, first, variableMap, scopes, parentScope) match {
+        scopes.addOne(ScopeEntry(parentScope))
+        val s = scopes.length - 1
+        val ptc = parserRDUnoptimizedCondExpr(lexer, first, variableMap, scopes, s) match {
           case Right(pt) => pt
           case Left(e) => return Left(e)
         }
-        val lFuns = parserRDUnoptimizedExprP(lexer, first, variableMap, scopes, parentScope) match {
+        val lFuns = parserRDUnoptimizedExprP(lexer, first, variableMap, scopes, s) match {
           case Right(ofuns) => ofuns
           case Left(e) => return Left(e)
         }
@@ -785,12 +792,14 @@ def parserRDUnoptimizedSimple(
           lexer.next()
           parserRDUnoptimizedListP(lexer, first, variableMap, scopes, scope)
         case KOpenParen =>
+          scopes.addOne(ScopeEntry(scope))
+          val s = scopes.length - 1
           lexer.next()
-          val ptc = parserRDUnoptimizedCondExpr(lexer, first, variableMap, scopes, scope) match {
+          val ptc = parserRDUnoptimizedCondExpr(lexer, first, variableMap, scopes, s) match {
             case Right(pt) => pt
             case Left(e) => return Left(e)
           }
-          val lFuns = parserRDUnoptimizedExprP(lexer, first, variableMap, scopes, scope) match {
+          val lFuns = parserRDUnoptimizedExprP(lexer, first, variableMap, scopes, s) match {
             case Right(funs) => funs
             case Left(e) => return Left(e)
           }
@@ -825,11 +834,13 @@ def parserRDUnoptimizedListP(
         lexer.next()
         Right(Const(Nil))
       } else if (first(CondExpr.ordinal).map(v => v.ordinal).contains(t.ordinal)) {
-        val ptc = parserRDUnoptimizedCondExpr(lexer, first, variableMap, scopes, scope) match {
+        scopes.addOne(ScopeEntry(scope))
+        val s = scopes.length - 1
+        val ptc = parserRDUnoptimizedCondExpr(lexer, first, variableMap, scopes, s) match {
           case Right(pt) => pt
           case Left(e) => return Left(e)
         }
-        val lFuns = parserRDUnoptimizedExprP(lexer, first, variableMap, scopes, scope) match {
+        val lFuns = parserRDUnoptimizedExprP(lexer, first, variableMap, scopes, s) match {
           case Right(funs) => funs
           case Left(e) => return Left(e)
         }
@@ -873,11 +884,13 @@ def parserRDUnoptimizedListElemsP(
     case Some(t) =>
       if (t.ordinal == KComma.ordinal) {
         lexer.next()
-        val ptc = parserRDUnoptimizedCondExpr(lexer, first, variableMap, scopes, scope) match {
+        scopes.addOne(ScopeEntry(scope))
+        val s = scopes.length - 1
+        val ptc = parserRDUnoptimizedCondExpr(lexer, first, variableMap, scopes, s) match {
           case Right(pt) => pt
           case Left(e) => return Left(e)
         }
-        val lFuns = parserRDUnoptimizedExprP(lexer, first, variableMap, scopes, scope) match {
+        val lFuns = parserRDUnoptimizedExprP(lexer, first, variableMap, scopes, s) match {
           case Right(funs) => funs
           case Left(e) => return Left(e)
         }
