@@ -1,0 +1,5 @@
+def map f l = if l=nil then nil
+                       else f x:map f xs where x  = hd l;
+                                                    xs = tl l
+.
+map {x = x*x} [1, 2, 3, 4, 5]

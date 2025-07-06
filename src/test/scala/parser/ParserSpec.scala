@@ -97,7 +97,7 @@ class ParserSpec extends munit.FunSuite {
     import cli.readFileBinImmediate
 
     val gen = ParserGenerator[Token, NonTerminal]()
-    val tbl = gen.oracleTable(Token.SOr.ordinal + 1, NonTerminal.values.length, derMap, emMap)
+    val tbl = gen.oracleTable(Token.KCloseCurlyBracket.ordinal + 1, NonTerminal.values.length, derMap, emMap)
     val parser = Parser[Token, NonTerminal]()
 
     val lFib = Lexer(readFileBinImmediate("./examples/fibonacci.sasl"))

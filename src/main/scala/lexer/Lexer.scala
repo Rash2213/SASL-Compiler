@@ -34,6 +34,9 @@ enum Token:
   case SGreaterEqual
   case SAnd
   case SOr
+  // extended for anonymous functions
+  case KOpenCurlyBracket
+  case KCloseCurlyBracket
 
 def charNum(char:Byte): Boolean =
   '0' <= char && char <= '9'
@@ -166,6 +169,9 @@ class Lexer(private val raw: Array[Byte]) extends PeekIterator[Token]:
       case ')' => idx += 1; return Some(Token.KCloseParen)
       case '[' => idx += 1; return Some(Token.KOpenBracket)
       case ']' => idx += 1; return Some(Token.KCloseBracket)
+      // extended for anonymous functions
+      case '{' => idx += 1; return Some(Token.KOpenCurlyBracket)
+      case '}' => idx += 1; return Some(Token.KCloseCurlyBracket)
       case ':' => idx += 1; return Some(Token.KColon)
       case ';' => idx += 1; return Some(Token.KSemicolon)
       case '.' => idx += 1; return Some(Token.KDot)

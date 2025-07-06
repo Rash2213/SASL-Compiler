@@ -108,6 +108,14 @@ object SaslCompilerApp extends CommandIOApp(
   version = "0.0.x"
 ) {
   private def handleCompileError(error: CommandCompileError): IO[ExitCode] = error match {
+    case CommandCompileError.P(ParseError.WrongToken(e, a)) =>
+      IO.println(s"Encountered error during parsing: expected token ${e.productPrefix} but received ${a.productPrefix}!") >> IO.pure(ExitCode.Error)
+    case CommandCompileError.P(ParseError.WrongFirst(nt, t)) =>
+      IO.println(s"Encountered error during parsing: expected some ${nt.productPrefix} but received ${t.productPrefix}!") >> IO.pure(ExitCode.Error)
+    case CommandCompileError.P(ParseError.UnexpectedEnding(t)) =>
+      IO.println(s"Encountered error during parsing: expected token ${t.productPrefix} but file ended!") >> IO.pure(ExitCode.Error)
+    case CommandCompileError.P(ParseError.UnexpectedEmpty(nt)) =>
+      IO.println(s"Encountered error druing parsing: expected some ${nt.productPrefix} but file ended!") >> IO.pure(ExitCode.Error)
     case CommandCompileError.P(parseError) =>
       // ToDo: better parser errors
       IO.println(s"Encountered error during parsing!") >> IO.pure(ExitCode.Error)

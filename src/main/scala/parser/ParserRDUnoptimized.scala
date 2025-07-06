@@ -73,8 +73,8 @@ def parserRDUnoptimizedSystem(
             }
             lexer.peek() match {
               case Some(KDot) => lexer.next()
-              case Some(_) => return Left(ParseError.ToDo)
-              case None => return Left(ParseError.ToDo)
+              case Some(token) => return Left(ParseError.WrongToken(KDot, token))
+              case None => return Left(ParseError.UnexpectedEnding(KDot))
             }
             scopes.addOne(ScopeEntry(0))
             val scopeM = scopes.length-1
@@ -90,8 +90,8 @@ def parserRDUnoptimizedSystem(
               case None => ptc
               case Some(funs) => ParseTreeUnoptimized.Where(ptc, funs)
             })
-          case Some(_) => Left(ParseError.ToDo)
-          case None => Left(ParseError.ToDo)
+          case Some(t) => Left(ParseError.WrongToken(Id(""), t))
+          case None => Left(ParseError.UnexpectedEnding(Id("")))
         }
       } else if (first(CondExpr.ordinal).map(v => v.ordinal).contains(t.ordinal)) {
         scopes.addOne(ScopeEntry(0))
@@ -109,9 +109,9 @@ def parserRDUnoptimizedSystem(
           case Some(funs) => ParseTreeUnoptimized.Where(ptc, funs)
         })
       } else {
-        Left(ParseError.ToDo)
+        Left(ParseError.WrongFirst(CondExpr, t))
       }
-    case None => Left(ParseError.ToDo)
+    case None => Left(ParseError.UnexpectedEmpty(System))
   }
 }
 //  ⟨funcdefs’⟩ → def id ⟨abstraction⟩ ⟨expr’⟩ ⟨funcdefs’⟩
@@ -149,7 +149,8 @@ def parserRDUnoptimizedFuncDefsP(
             case Some(funs) => (ParseTreeUnoptimized.Where(pta._1, funs), pta._2)
           }
           parserRDUnoptimizedFuncDefsP(lexer, first, variableMap, scopes)
-        case _ => Left(ParseError.ToDo)
+        case Some(t) => Left(ParseError.WrongToken(Id(""), t))
+        case None => Left(ParseError.UnexpectedEnding(Id("")))
       }
     case None => Right(())
   }
@@ -188,7 +189,8 @@ def parserRDUnoptimizedExprP(
             case Right(funs) => Right(Some(funs))
             case Left(e) => return Left(e)
           }
-        case _ => Left(ParseError.ToDo)
+        case Some(t) => Left(ParseError.WrongToken(Id(""), t))
+        case None => Left(ParseError.UnexpectedEnding(Id("")))
       }
     case None => Right(None)
   }
@@ -220,9 +222,9 @@ def parserRDUnoptimizedAbstraction(
           argList = argList.appended(abstractionScope.toString + s)
           lexer.next()
           parserRDUnoptimizedAbstraction(lexer, first, variableMap, scopes, parentScope, abstractionScope, argList)
-        case _ => Left(ParseError.ToDo)
+        case _ => Left(ParseError.WrongToken(Id(""), t))
       }
-    case None => Left(ParseError.ToDo)
+    case None => Left(ParseError.UnexpectedEnding(SEqual))
   }
 }
 //  ⟨defs’⟩ → ; id ⟨abstraction⟩ ⟨defs’⟩
@@ -252,7 +254,8 @@ def parserRDUnoptimizedDefsP(
             //variableMap(scope.toString + s) = pta
             val lFuns = funs :+ (scope.toString + s, pta)
             parserRDUnoptimizedDefsP(lexer, first, variableMap, scopes, scope, lFuns)
-          case _ => Left(ParseError.ToDo)
+          case Some(t) => Left(ParseError.WrongToken(Id(""), t))
+          case None => Left(ParseError.UnexpectedEnding(Id("")))
         }
       } else {
         Right(funs)
@@ -285,8 +288,8 @@ def parserRDUnoptimizedCondExpr(
         }
         lexer.peek() match {
           case Some(KThen) => lexer.next()
-          case Some(_) => return Left(ParseError.ToDo)
-          case None => return Left(ParseError.ToDo)
+          case Some(t) => return Left(ParseError.WrongToken(KThen, t))
+          case None => return Left(ParseError.UnexpectedEnding(KThen))
         }
         val ptt = parserRDUnoptimizedCondExpr(lexer, first, variableMap, scopes, parentScope) match {
           case Right(pt) => pt
@@ -294,8 +297,8 @@ def parserRDUnoptimizedCondExpr(
         }
         lexer.peek() match {
           case Some(KElse) => lexer.next()
-          case Some(_) => return Left(ParseError.ToDo)
-          case None => return Left(ParseError.ToDo)
+          case Some(t) => return Left(ParseError.WrongToken(KElse, t))
+          case None => return Left(ParseError.UnexpectedEnding(KElse))
         }
         val pte = parserRDUnoptimizedCondExpr(lexer, first, variableMap, scopes, parentScope) match {
           case Right(pt) => pt
@@ -319,9 +322,9 @@ def parserRDUnoptimizedCondExpr(
       } else if (first(ListExpr.ordinal).map(v => v.ordinal).contains(t.ordinal)) {
         parserRDUnoptimizedListExpr(lexer, first, variableMap, scopes, parentScope)
       } else {
-        Left(ParseError.ToDo)
+        Left(ParseError.WrongFirst(CondExpr, t))
       }
-    case None => Left(ParseError.ToDo)
+    case None => Left(ParseError.UnexpectedEmpty(CondExpr))
   }
 }
 //  ⟨listexpr⟩ → ⟨factor⟩ ⟨mul’⟩ ⟨add’⟩ ⟨compar’⟩ ⟨conjunct’⟩ ⟨opexpr’⟩ ⟨listexpr’⟩
@@ -359,7 +362,7 @@ def parserRDUnoptimizedListExpr(
         case Left(e) => return Left(e)
       }
       parserRDUnoptimizedListExprP(lexer, first, variableMap, opt, scopes, scope)
-    case None => Left(ParseError.ToDo)
+    case None => Left(ParseError.UnexpectedEmpty(Factor))
   }
 }
 //  ⟨listexpr’⟩ → : ⟨listexpr⟩
@@ -729,10 +732,10 @@ def parserRDUnoptimizedFactor(
         }
         Right(cp)
       } else {
-        Left(ParseError.ToDo)
+        Left(ParseError.WrongFirst(Factor, t))
       }
     case None =>
-      Left(ParseError.ToDo)
+      Left(ParseError.UnexpectedEmpty(Factor))
   }
 }
 
@@ -780,6 +783,8 @@ def parserRDUnoptimizedCombP(
 //    | nil
 //    | [ ⟨list’⟩
 //    | ( ⟨condexpr⟩ ⟨expr’⟩ )
+// extended for anonymous functions
+//    | { ⟨abstraction⟩ }
 def parserRDUnoptimizedSimple(
                     lexer: PeekIterator[Token],
                     first: ParserRD.gen.FirstMap,
@@ -822,18 +827,36 @@ def parserRDUnoptimizedSimple(
           }
           lexer.peek() match {
             case Some(KCloseParen) => lexer.next()
-            case Some(_) => return Left(ParseError.ToDo)
-            case None => return Left(ParseError.ToDo)
+            case Some(token) => return Left(ParseError.WrongToken(KCloseParen, token))
+            case None => return Left(ParseError.UnexpectedEnding(KCloseParen))
           }
           Right(lFuns match {
             case None => ptc
             case Some(funs) => ParseTreeUnoptimized.Where(ptc, funs)
           })
+        // extended for anonymous functions
+        case KOpenCurlyBracket =>
+          scopes.addOne(ScopeEntry(scope))
+          val s = scopes.length - 1
+          lexer.next()
+          val fun = parserRDUnoptimizedAbstraction(lexer, first, variableMap, scopes, scope, s) match {
+            case Left(e) => return Left(e)
+            case Right(fun) => fun
+          }
+          lexer.peek() match {
+            case Some(KCloseCurlyBracket) => lexer.next()
+            case Some(t) => return Left(ParseError.WrongToken(KCloseParen, t))
+            case None => return Left(ParseError.UnexpectedEnding(KCloseParen))
+          }
+          Right(ParseTreeUnoptimized.Where(
+            ParseTreeUnoptimized.Ident("&lambda", Some(s)),
+            Array((s.toString + "&lambda", fun))
+          ))
         case _ =>
-          Left(ParseError.ToDo)
+          Left(ParseError.WrongFirst(Simple, t))
       }
     case None =>
-      Left(ParseError.ToDo)
+      Left(ParseError.UnexpectedEmpty(Simple))
   }
 }
 //  ⟨list’⟩ → ]
@@ -878,14 +901,14 @@ def parserRDUnoptimizedListP(
               case None => pt
               case Some(funs) => ParseTreeUnoptimized.Where(pt, funs)
             })
-          case Some(_) => Left(ParseError.ToDo)
-          case None => Left(ParseError.ToDo)
+          case Some(t) => Left(ParseError.WrongToken(KCloseBracket, t))
+          case None => Left(ParseError.UnexpectedEnding(KCloseBracket))
         }
       } else {
-        Left(ParseError.ToDo)
+        Left(ParseError.WrongFirst(ListP, t))
       }
     case None =>
-      Left(ParseError.ToDo)
+      Left(ParseError.UnexpectedEmpty(ListP))
   }
 }
 //  ⟨listelems’⟩ → , ⟨condexpr⟩ ⟨expr’⟩ ⟨listelems’⟩
@@ -928,6 +951,6 @@ def parserRDUnoptimizedListElemsP(
         Right(Const(Constant.Nil))
       }
     case None =>
-      Left(ParseError.ToDo)
+      Left(ParseError.UnexpectedEmpty(ListElemsP))
   }
 }

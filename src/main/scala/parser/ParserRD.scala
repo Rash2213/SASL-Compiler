@@ -20,6 +20,10 @@ enum ParseTree:
   case Application(operator: ParseTree, operand: ParseTree)
 
 enum ParseError:
+  case WrongFirst(expected: NonTerminal, actual: Token)
+  case WrongToken(expected: Token, actual: Token)
+  case UnexpectedEnding(expected: Token)
+  case UnexpectedEmpty(expected: NonTerminal)
   case ToDo
 
 object ParserRD:

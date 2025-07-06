@@ -154,6 +154,8 @@ object SaslData:
     //    | nil
     //    | [ ⟨list’⟩
     //    | ( ⟨condexpr⟩ ⟨expr’⟩ )
+    // extended for anonymous functions
+    //    | { ⟨abstraction⟩ }
     Array(
       Array[gen.GrammarSymbol](T(Id(""))),
       Array[gen.GrammarSymbol](T(CNum(0))),
@@ -161,7 +163,9 @@ object SaslData:
       Array[gen.GrammarSymbol](T(CString(""))),
       Array[gen.GrammarSymbol](T(CNil)),
       Array[gen.GrammarSymbol](T(KOpenBracket), NT(ListP)),
-      Array[gen.GrammarSymbol](T(KOpenParen), NT(CondExpr), NT(ExprP), T(KCloseParen))
+      Array[gen.GrammarSymbol](T(KOpenParen), NT(CondExpr), NT(ExprP), T(KCloseParen)),
+      // extended for anonymous functions
+      Array[gen.GrammarSymbol](T(KOpenCurlyBracket), NT(CondExpr), T(KCloseCurlyBracket)),
     ),
     //  ⟨list’⟩ → ]
     //    | ⟨condexpr⟩ ⟨expr’⟩ ⟨listelems’⟩ ]
