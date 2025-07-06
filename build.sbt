@@ -12,4 +12,9 @@ lazy val root = (project in file("."))
     )
   )
 
+javacOptions ++= Seq("-encoding", "UTF-8")
+scalacOptions ++= Seq("-encoding", "UTF-8")
+
+// For running and forking JVMs
+javaOptions ++= Seq("-Dfile.encoding=UTF-8")
 // See https://www.scala-sbt.org/1.x/docs/Using-Sonatype.html for instructions on how to publish to Sonatype.

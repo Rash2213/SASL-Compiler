@@ -53,6 +53,78 @@ def charWhitespace(char: Byte): Boolean =
     || char == '\r'
     || char == '\f'
 
+def replaceEscapeSequences(input: String): String = {
+  val sb = new StringBuilder()
+  var i = 0
+  while (i < input.length) {
+    if (input.charAt(i) == '\\') {
+      if (i + 1 < input.length) {
+        input.charAt(i + 1) match {
+          case 'a' => sb.append('\u0008'); i += 2
+          case 'b' => sb.append('\b'); i += 2
+          case 'e' => sb.append('\u001B'); i += 2
+          case 'f' => sb.append('\f'); i += 2
+          case 'n' => sb.append('\n'); i += 2
+          case 'r' => sb.append('\r'); i += 2
+          case 't' => sb.append('\t'); i += 2
+          case 'v' => sb.append('\u000B'); i += 2
+          case '\\' => sb.append('\\'); i += 2
+          case '\'' => sb.append('\''); i += 2
+          case '"' => sb.append('"'); i += 2
+          case '?' => sb.append('?'); i += 2
+          case 'u' =>
+            if (i + 5 < input.length) {
+              try {
+                sb.append(String(Character.toChars(Integer.parseUnsignedInt(input.substring(i+2, i+6), 16))))
+                i += 6
+              } catch {
+                case _: NumberFormatException =>
+                  sb.append('\\').append('u')
+                  i += 2
+                case _: IllegalArgumentException =>
+                  sb.append('\\').append('u')
+                  i += 2
+              }
+            } else {
+              sb.append('\\').append('u')
+              i += 2
+            }
+          case 'U' =>
+            if (i + 9 < input.length) {
+              try {
+                sb.append(String(Character.toChars(Integer.parseUnsignedInt(input.substring(i+2, i+10), 16))))
+                i += 10
+              } catch {
+                case _: NumberFormatException =>
+                  sb.append('\\').append('U')
+                  i += 2
+                case _: IllegalArgumentException =>
+                  sb.append('\\').append('U')
+                  i += 2
+              }
+            } else {
+              sb.append('\\').append('U')
+              i += 2
+            }
+          case other =>
+            // backslash and a char not equalling a escape sequence
+            // append both characters
+            sb.append('\\').append(other)
+            i += 2
+        }
+      } else {
+        // Backslash at the end of the string, append it literally, should not happen from lexer
+        sb.append('\\')
+        i += 1
+      }
+    } else {
+      sb.append(input.charAt(i))
+      i += 1
+    }
+  }
+  sb.toString()
+}
+
 trait PeekIterator[A] extends Iterator[A] {
   /** Method to peek at the next element without consuming it */
   def peek(): Option[A]
@@ -125,14 +197,23 @@ class Lexer(private val raw: Array[Byte]) extends PeekIterator[Token]:
         // ToDo: will lead to issues for utf-8 multi byte chars which might accidentally contain the same byte
         // ToDo: also support escape sequences
         idx += 1
-        while (raw(idx) != '"') {
+        if idx >= raw.length then {
+          return None
+        }
+        var escaped = false
+        while (raw(idx) != '"' || escaped) {
+          if (raw(idx) == '\\') {
+            escaped = !escaped
+          } else {
+            escaped = false
+          }
           idx += 1
           if idx >= raw.length then {
             return None
           }
         }
         idx += 1
-        return Some(Token.CString(String(raw.slice(start+1, idx-1), StandardCharsets.UTF_8)))
+        return Some(Token.CString(replaceEscapeSequences(String(raw.slice(start+1, idx-1), StandardCharsets.UTF_8))))
       case _ => // Necessary, because Scala's otherwise assumes we always return
     }
 
