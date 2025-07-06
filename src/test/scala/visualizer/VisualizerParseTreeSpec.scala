@@ -2,7 +2,7 @@ package visualizer
 
 import parser.ParseTree.*
 import parser.{ParseTree, VariableMap, Constant, ParserGenerator, Scopes, parserRDSystem}
-import cli.{getFilename, readFileBin}
+import cli.{getFilename, readFileBinImmediate}
 import lexer.{Lexer, Token}
 import parser.SaslData.{NonTerminal, derMap, emMap}
 
@@ -61,7 +61,7 @@ class VisualizerParseTreeSpec extends munit.FunSuite {
   test("visualization of examples") {
     val files = Array("examples/qsort.sasl", "examples/sieve.sasl", "examples/fibonacci.sasl")
     for (file <- files) {
-      val raw = readFileBin(file)
+      val raw = readFileBinImmediate(file)
       val lexer = Lexer(raw)
       val gen: ParserGenerator[Token, NonTerminal] = ParserGenerator()
       val fr = gen.first(NonTerminal.values.length, derMap, emMap)

@@ -1,9 +1,12 @@
 package compiler
 
+import cats.data.EitherT
+import cats.effect.IO
+import cats.syntax.all.*
 import compiler.CompilerError.UnresolvedVariable
-import vm.{ReductionTreeUnoptimized, Ownership}
+import vm.{Ownership, ReductionTreeUnoptimized}
 import vm.Ownership.*
-import parser.{Constant, ParseTreeUnoptimized, Scopes, VariableMapUnoptimized}
+import parser.{Constant, ParseTreeUnoptimized, ScopesRes, VariableMapUnoptimizedRes}
 import parser.ParseTreeUnoptimized.*
 
 class CompilerUnoptimized {
@@ -29,7 +32,7 @@ class CompilerUnoptimized {
     "hd" -> ReductionTreeUnoptimized.Hd,
   )
 
-  def resolveVarScopedName(name: String, scope: Int, scopes: Scopes, varNames: Set[String]): Option[String] = {
+  def resolveVarScopedName(name: String, scope: Int, scopes: ScopesRes, varNames: Set[String]): Option[String] = {
     var s = scope
     while (s != 0) {
       val scopedName = s.toString + name
@@ -42,7 +45,7 @@ class CompilerUnoptimized {
     Some(scopedName).filter(varNames.contains)
   }
 
-  def resolveVarScopedArg(name: String, scope: Int, scopes: Scopes, envMap: Map[String, ReductionTreeUnoptimized], args: Set[String]): Option[Ownership[ReductionTreeUnoptimized]] = {
+  def resolveVarScopedArg(name: String, scope: Int, scopes: ScopesRes, envMap: Map[String, ReductionTreeUnoptimized], args: Set[String]): Option[Ownership[ReductionTreeUnoptimized]] = {
     var s = scope
     while (s != 0) {
       envMap.get(s.toString + name) match {
@@ -60,7 +63,7 @@ class CompilerUnoptimized {
     }
   }
 
-  def resolveVarScoped(name: String, scope: Int, scopes: Scopes, envMap: Map[String, ReductionTreeUnoptimized]): Option[ReductionTreeUnoptimized] = {
+  def resolveVarScoped(name: String, scope: Int, scopes: ScopesRes, envMap: Map[String, ReductionTreeUnoptimized]): Option[ReductionTreeUnoptimized] = {
     var s = scope
     while (s != 0) {
       envMap.get(s.toString + name) match {
@@ -72,7 +75,7 @@ class CompilerUnoptimized {
     envMap.get("0" + name)
   }
 
-  def compileLoose(tree: ParseTreeUnoptimized, scopes: Scopes, envMap: Map[String, ReductionTreeUnoptimized], argNames: Set[String]): Either[CompilerError, Ownership[ReductionTreeUnoptimized]] = {
+  def compileLoose(tree: ParseTreeUnoptimized, scopes: ScopesRes, envMap: Map[String, ReductionTreeUnoptimized], argNames: Set[String]): Either[CompilerError, Ownership[ReductionTreeUnoptimized]] = {
     tree match {
       case Const(c) => Right(Strong(ReductionTreeUnoptimized.Const(c)))
       case Application(f, x) =>
@@ -161,7 +164,7 @@ class CompilerUnoptimized {
     }
   }
 
-  def compileStrict(tree: ParseTreeUnoptimized, scopes: Scopes, env: Map[String, ReductionTreeUnoptimized]): Either[CompilerError, ReductionTreeUnoptimized] = {
+  def compileStrict(tree: ParseTreeUnoptimized, scopes: ScopesRes, env: Map[String, ReductionTreeUnoptimized]): Either[CompilerError, ReductionTreeUnoptimized] = {
     tree match {
       case Const(c) => Right(ReductionTreeUnoptimized.Const(c))
       case Ident(name, scope) =>
@@ -309,7 +312,7 @@ class CompilerUnoptimized {
         )),
         xa
       )
-    case u @ ReductionTreeUnoptimized.Unresolved(n) =>
+    case u@ReductionTreeUnoptimized.Unresolved(n) =>
       if (n == name) {
         ReductionTreeUnoptimized.I
       } else {
@@ -354,38 +357,60 @@ class CompilerUnoptimized {
 
   def compileProgram(
                       mainTree: ParseTreeUnoptimized,
-                      scopes: Scopes,
-                      varMap: VariableMapUnoptimized,
-                    ): Either[CompilerError, ReductionTreeUnoptimized] = {
+                      scopes: ScopesRes,
+                      varMap: VariableMapUnoptimizedRes // Assuming VariableMapUnoptimizedRes is Map[String, (ParseTreeUnoptimized, List[String])]
+                    ): IO[Either[CompilerError, ReductionTreeUnoptimized]] = {
     val compiledDefs: Map[String, ReductionTreeUnoptimized.Application] = varMap.map {
       case (name, _) =>
-        val rt: ReductionTreeUnoptimized.Application = ReductionTreeUnoptimized.Application(Strong(ReductionTreeUnoptimized.I), Strong(ReductionTreeUnoptimized.I))
+        val rt: ReductionTreeUnoptimized.Application = ReductionTreeUnoptimized.Application(
+          Strong(ReductionTreeUnoptimized.I),
+          Strong(ReductionTreeUnoptimized.I),
+        )
         name -> rt
-    }.toMap
-    varMap.toList.foldLeft(()) {
-      case (_, (name, (pt, args))) =>
-        val compiledBody = compileLoose(pt, scopes, compiledDefs, args.toSet) match {
-          case Right(rt) => rt
-          case Left(e) => return Left(e)
-        }
-        compiledBody match {
-          case Strong(ReductionTreeUnoptimized.Application(f, x)) =>
-            compiledDefs(name).operator = f
-            compiledDefs(name).operand = x
-          case x =>
-            compiledDefs(name).operand = x
-        }
-        args.reverseIterator.foreach { arg => abstractVarInPlace(arg, compiledDefs(name)) }
-        /*val abstracted = args.foldRight(compiledBody) { (arg, acc) => abstractVar(arg, acc) }
-        abstracted match {
-          case ReductionTreeUnoptimized.Application(f, x) =>
-            compiledDefs(name).operator = f
-            compiledDefs(name).operand = x
-          case x =>
-            compiledDefs(name).operand = x
-        }*/
     }
 
-    compileStrict(mainTree, scopes, compiledDefs)
+    def compileSingleDefinition(
+                                 name: String,
+                                 pt: ParseTreeUnoptimized,
+                                 args: Array[String]
+                               ): IO[Either[CompilerError, Unit]] = {
+      IO.delay(compileLoose(pt, scopes, compiledDefs, args.toSet)).flatMap {
+        case Left(e) => IO.pure(Left(e))
+        case Right(compiledBody) =>
+          compiledBody match {
+            case Strong(ReductionTreeUnoptimized.Application(f, x)) =>
+              compiledDefs(name).operator = f
+              compiledDefs(name).operand = x
+              IO.unit.as(Right(()))
+            case x =>
+              compiledDefs(name).operand = x
+              IO.unit.as(Right(()))
+          }
+      }.flatMap {
+        case Left(e) => IO.pure(Left(e))
+        case Right(_) =>
+          IO.delay {
+              args.reverseIterator.foreach { arg => abstractVarInPlace(arg, compiledDefs(name)) }
+            }.as(Right(()))
+      }
+    }
+
+    val compileRes: IO[Either[CompilerError, Unit]] =
+      varMap.toList
+        .parTraverse { case (name, (pt, args)) =>
+          compileSingleDefinition(name, pt, args)
+        }
+        .map { (results: List[Either[CompilerError, Unit]]) =>
+          results.collectFirst { case Left(e) => e } match {
+            case Some(err) => Left(err)
+            case None => Right(())
+          }
+        }
+
+    (for {
+      _ <- EitherT(compileRes)
+      mainResult <- EitherT.fromEither[IO](compileStrict(mainTree, scopes, compiledDefs))
+        .leftMap(identity)
+    } yield mainResult).value
   }
 }

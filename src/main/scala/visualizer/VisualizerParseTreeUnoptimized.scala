@@ -1,7 +1,7 @@
 package visualizer
 
 import parser.ParseTreeUnoptimized.*
-import parser.{ParseTreeUnoptimized, Constant, VariableMapUnoptimized}
+import parser.{ParseTreeUnoptimized, Constant, VariableMapUnoptimizedRes}
 
 import scala.collection.mutable
 
@@ -54,7 +54,7 @@ class VisualizerParseTreeUnoptimized {
     id
   }
 
-  def generateDot(tree: ParseTreeUnoptimized, varMap: VariableMapUnoptimized): String = {
+  def generateDot(tree: ParseTreeUnoptimized, varMap: VariableMapUnoptimizedRes): String = {
     sb.clear()
     val pid = nextId()
     sb.append("digraph ParseTree {\n")

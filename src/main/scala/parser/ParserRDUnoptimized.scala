@@ -2,7 +2,7 @@ package parser
 
 import lexer.{PeekIterator, Token}
 import lexer.Token.*
-import SaslData.NonTerminal
+import parser.SaslData.{NonTerminal, derMap, emMap}
 import SaslData.NonTerminal.*
 
 import scala.collection.mutable
@@ -16,8 +16,25 @@ enum ParseTreeUnoptimized:
 
 type VariableMapUnoptimized = mutable.Map[String, (ParseTreeUnoptimized, Array[String])]
 
+type VariableMapUnoptimizedRes = Map[String, (ParseTreeUnoptimized, Array[String])]
+
+type ScopesRes = Array[ScopeEntry]
+
 import ParseTreeUnoptimized.*
 import Constant.*
+
+def parserRDUnoptimized(lexer: PeekIterator[Token]): Either[ParseError, (ParseTreeUnoptimized, ScopesRes, VariableMapUnoptimizedRes)] = {
+  // ToDo: use pre-generated table
+  val gen: ParserGenerator[Token, NonTerminal] = ParserGenerator()
+  val fr = gen.first(NonTerminal.values.length, derMap, emMap)
+  val firstSet = fr._1
+  val varMap: VariableMapUnoptimized = mutable.Map()
+  val scopes: Scopes = mutable.ArrayBuffer()
+  parserRDUnoptimizedSystem(lexer, firstSet, varMap, scopes) match {
+    case Right(pt) => Right((pt, scopes.toArray, varMap.toMap))
+    case Left(e) => Left(e)
+  }
+}
 
 //  ⟨system⟩ → def id ⟨abstraction⟩ ⟨expr’⟩ ⟨funcdefs’⟩ . ⟨condexpr⟩ ⟨expr’⟩
 //    | ⟨condexpr⟩ ⟨expr’⟩

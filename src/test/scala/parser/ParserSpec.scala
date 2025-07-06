@@ -94,17 +94,17 @@ class ParserSpec extends munit.FunSuite {
   test("examples syntax is correct") {
     import lexer.{Token, Lexer}
     import SaslData.{NonTerminal, derMap, emMap}
-    import cli.readFileBin
+    import cli.readFileBinImmediate
 
     val gen = ParserGenerator[Token, NonTerminal]()
     val tbl = gen.oracleTable(Token.SOr.ordinal + 1, NonTerminal.values.length, derMap, emMap)
     val parser = Parser[Token, NonTerminal]()
 
-    val lFib = Lexer(readFileBin("./examples/fibonacci.sasl"))
+    val lFib = Lexer(readFileBinImmediate("./examples/fibonacci.sasl"))
     assert(parser.check(lFib, GrammarSymbolGeneric.NT(NonTerminal.System), tbl, emMap))
-    val lQsort = Lexer(readFileBin("./examples/qsort.sasl"))
+    val lQsort = Lexer(readFileBinImmediate("./examples/qsort.sasl"))
     assert(parser.check(lQsort, GrammarSymbolGeneric.NT(NonTerminal.System), tbl, emMap))
-    val lSieve = Lexer(readFileBin("./examples/sieve.sasl"))
+    val lSieve = Lexer(readFileBinImmediate("./examples/sieve.sasl"))
     assert(parser.check(lSieve, GrammarSymbolGeneric.NT(NonTerminal.System), tbl, emMap))
   }
 }

@@ -1,5 +1,6 @@
 package vm
 
+import cats.effect.IO
 import parser.Constant
 
 import scala.collection.mutable
@@ -361,26 +362,34 @@ def reduceUnoptimized(tree: ReductionTreeUnoptimized): Either[String, ReductionR
  * Does not print a newline after its output.
  * @param tree a compilation tree as received from the compiler
  */
-def evalAndPrintUnoptimized(tree: ReductionTreeUnoptimized): Unit = {
-  reduceUnoptimized(tree) match {
-    case Left(e) => print("Reduction Error: " + e)
+def evalAndPrintUnoptimizedInner(tree: ReductionTreeUnoptimized): IO[Unit] = {
+  IO.delay(reduceUnoptimized(tree)).flatMap {
+    case Left(e) => IO.println(s"Reduction Error: $e") // Use IO.println for IO effects
     case Right(res) =>
       res match {
         case ReductionResultUnoptimized.Const(c) =>
           c match {
             case Constant.Bool(b) =>
-              print(b.toString + " (bool)")
+              IO.print(s"${b.toString} (bool)")
             case Constant.Num(n) =>
-              print(n.toString + " (num)")
+              IO.print(s"${n.toString} (num)")
             case Constant.Str(s) =>
-              print("\"" + s + "\" (string)")
+              IO.print(s"\"$s\" (string)")
             case Constant.Nil =>
-              print("nil")
+              IO.print("nil")
           }
         case ReductionResultUnoptimized.List(p) =>
-          evalAndPrintUnoptimized(p.hd)
-          print(" : ")
-          evalAndPrintUnoptimized(p.tl)
+          evalAndPrintUnoptimizedInner(p.hd)
+            .flatMap(_ => IO.print(" : "))
+            .flatMap(_ => evalAndPrintUnoptimizedInner(p.tl))
       }
   }
+}
+
+/**
+ * Prints the result of evaluating the `tree` (a constant or a potentially infinite list).
+ * @param tree a compilation tree as received from the compiler
+ */
+def evalAndPrintUnoptimized(tree: ReductionTreeUnoptimized): IO[Unit] = {
+  evalAndPrintUnoptimizedInner(tree) >> IO.println("")
 }
