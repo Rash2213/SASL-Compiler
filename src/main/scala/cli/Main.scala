@@ -6,6 +6,7 @@ import parser.{ParseError, ParseTreeUnoptimized, ScopesRes, VariableMapUnoptimiz
 import visualizer.{VisualizerParseTreeUnoptimized, VisualizerReductionTreeUnoptimized}
 import compiler.{CompilerError, CompilerUnoptimized}
 import vm.{ReductionTreeUnoptimized, evalAndPrintUnoptimized}
+import serializer.{DeserializationError, SerializerUnoptimized}
 
 import java.io.{File, PrintWriter}
 import java.nio.file.{Files, Paths}
@@ -17,6 +18,8 @@ import com.monovore.decline.effect.*
 case class VisualizeParseTree(file: String, libs: List[String])
 case class VisualizeCompileTree(file: String, libs: List[String])
 case class Execute(file: String, libs: List[String], optimizer: Boolean)
+case class Compile(file: String, libs: List[String])
+case class ExecuteB(file: String, optimizer: Boolean)
 
 val fileOpts: Opts[String] = Opts.argument[String](metavar = "file")
 val optimizerOpts: Opts[Boolean] = Opts.flag("no-optimizer", "Disables the optimizer.").orFalse
@@ -31,6 +34,12 @@ val optsVisualizeCompileTree: Opts[VisualizeCompileTree] = Opts.subcommand("vis-
 }
 val optsExecute: Opts[Execute] = Opts.subcommand("ex", "Execute the given program.") {
   (fileOpts, libOpts, optimizerOpts).mapN((f, l, b) => Execute(f, l, !b))
+}
+val optsCompile: Opts[Compile] = Opts.subcommand("comp", "Compile the given program to saslbin.") {
+  (fileOpts, libOpts).mapN(Compile.apply)
+}
+val optsExecuteB: Opts[ExecuteB] = Opts.subcommand("exb", "Execute the given saslbin program binary.") {
+  (fileOpts, optimizerOpts).mapN((f, b) => ExecuteB(f, !b))
 }
 
 def printWriter(filePath: String): Resource[IO, PrintWriter] =
@@ -49,11 +58,11 @@ def readFileBin(filePath: String): IO[Array[Byte]] =
 def readFileBinLib(filePath: String): IO[Array[Byte]] =
   readFileBin(filePath) map { bytes =>
     val dotByte: Byte = 0x2E
-    val dotIndex = bytes.indexOf(dotByte) // `indexOf` on Array[Byte] is efficient
+    val dotIndex = bytes.indexOf(dotByte)
 
     val processedBytes = dotIndex match {
-      case -1 => bytes // No dot, use full content
-      case index => bytes.slice(0, index) // Truncate at first dot
+      case -1 => bytes
+      case index => bytes.slice(0, index)
     }
     processedBytes
   }
@@ -62,6 +71,9 @@ def writeFile(filePath: String, content: String): IO[Unit] =
   printWriter(filePath).use { pw =>
     IO.blocking(pw.write(content))
   }
+
+def writeFileBin(filePath: String, content: Array[Byte]): IO[Unit] =
+  IO.blocking(Files.write(Paths.get(filePath), content))
 
 def getFilename(filePath: String): String = {
   File(filePath).getName.stripSuffix(".sasl")
@@ -123,10 +135,19 @@ object SaslCompilerApp extends CommandIOApp(
         IO.println(s"Encountered error during compilation: Unresolved variable \"$n\"!") >> IO.pure(ExitCode.Error)
   }
 
+  private def handleDeserializationError(error: DeserializationError): IO[ExitCode] = error match {
+    case DeserializationError.IdNotFound(id) => IO.println(s"Encountered error during deserialization: id $id not found!") >> IO.pure(ExitCode.Error)
+    case DeserializationError.UnknownConstTag(tag) => IO.println(s"Encountered error during deserialization: unknown constant type tag $tag!") >> IO.pure(ExitCode.Error)
+    case DeserializationError.UnknownNodeTag(tag) => IO.println(s"Encountered error during deserialization: unknown node type tag $tag!") >> IO.pure(ExitCode.Error)
+    case DeserializationError.ExpectedApplication(rt) => IO.println(s"Encountered error during deserialization: expected application got ${rt.productPrefix}!") >> IO.pure(ExitCode.Error)
+  }
+
   override def main: Opts[IO[ExitCode]] =
     optsVisualizeParseTree
       .orElse(optsExecute)
       .orElse(optsVisualizeCompileTree)
+      .orElse(optsCompile)
+      .orElse(optsExecuteB)
       .map {
 
       case VisualizeParseTree(file, libs) =>
@@ -159,5 +180,26 @@ object SaslCompilerApp extends CommandIOApp(
           case Right(rt) => evalAndPrintUnoptimized(rt) *> IO.pure(ExitCode.Success)
           case Left(e) => handleCompileError(e)
         }
+
+      case Compile(file, libs) =>
+        compileUnoptimized(file, libs) flatMap {
+          case Right(rt) =>
+            val s = SerializerUnoptimized
+            for {
+              bin <- IO.delay(s.serialize(rt))
+              fn = getFilename(file)
+              _ <- writeFileBin(s"bin/${fn}.saslbin", bin) >> IO.println(s"Visualization saved to bin/${fn}.saslbin")
+            } yield ExitCode.Success
+          case Left(e) => handleCompileError(e)
+        }
+      case ExecuteB(file, optimizer) =>
+        val s = SerializerUnoptimized
+        for {
+          bin <- readFileBin(file)
+          res <- IO.delay(s.deserialize(bin)) flatMap {
+            case Right(rt) => evalAndPrintUnoptimized(rt) *> IO.pure(ExitCode.Success)
+            case Left(e) => handleDeserializationError(e)
+          }
+        } yield res
     }
 }
